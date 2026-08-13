@@ -429,3 +429,67 @@ body {
   body { background: white; color: #1a1a18; }
   @page { margin: 1.2cm; size: A4 landscape; }
 }
+
+
+/* ─── 开源命盘页响应式布局 ─────────────────────────────── */
+.chart-demo-page {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  overflow-x: clip;
+}
+.chart-reset-button {
+  margin-bottom: 16px;
+  padding: 6px 14px;
+  cursor: pointer;
+  border: 1px solid var(--bdr-heavy);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tx-1);
+}
+.chart-demo-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 20px;
+  align-items: stretch;
+}
+.chart-demo-board,
+.chart-demo-insight {
+  min-width: 0;
+}
+.chart-demo-insight {
+  min-height: 620px;
+}
+
+@media (max-width: 900px) {
+  .chart-demo-page {
+    padding: 16px 12px 28px;
+  }
+  .chart-demo-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .chart-demo-insight {
+    min-height: 560px;
+  }
+}
+
+@media (max-width: 480px) {
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .chart-demo-page {
+    padding: 12px 8px 24px;
+  }
+  .chart-reset-button {
+    margin-bottom: 10px;
+  }
+  .chart-demo-layout {
+    gap: 12px;
+  }
+  .chart-demo-insight {
+    min-height: 70vh;
+  }
+}
