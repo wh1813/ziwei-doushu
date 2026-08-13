@@ -12,14 +12,14 @@ export function getAiConfig(): AiConfig {
 
   const rawBaseUrl = process.env.AI_BASE_URL?.trim() || 'https://api.deepseek.com';
   const baseUrl = rawBaseUrl.replace(/\/+$/, '').replace(/\/chat\/completions$/, '');
-  const maxOutputTokens = Number.parseInt(process.env.AI_MAX_OUTPUT_TOKENS || '1800', 10);
-  const timeoutMs = Number.parseInt(process.env.AI_TIMEOUT_MS || '90000', 10);
+  const maxOutputTokens = Number.parseInt(process.env.AI_MAX_OUTPUT_TOKENS || '1000', 10);
+  const timeoutMs = Number.parseInt(process.env.AI_TIMEOUT_MS || '25000', 10);
 
   return {
     baseUrl,
     apiKey,
     model: process.env.AI_MODEL?.trim() || 'deepseek-v4-flash',
-    maxOutputTokens: Number.isFinite(maxOutputTokens) ? Math.min(Math.max(maxOutputTokens, 256), 4096) : 1800,
-    timeoutMs: Number.isFinite(timeoutMs) ? Math.min(Math.max(timeoutMs, 5000), 120000) : 90000,
+    maxOutputTokens: Number.isFinite(maxOutputTokens) ? Math.min(Math.max(maxOutputTokens, 256), 4096) : 1000,
+    timeoutMs: Number.isFinite(timeoutMs) ? Math.min(Math.max(timeoutMs, 5000), 30000) : 25000,
   };
 }
