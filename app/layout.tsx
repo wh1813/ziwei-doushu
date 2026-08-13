@@ -1,22 +1,22 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { Analytics } from '@vercel/analytics/next';
-import { SpeedInsights } from '@vercel/speed-insights/next';
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export const metadata: Metadata = {
   title: '紫微命盘 · 倪海夏正宗紫微斗数',
   description: '基于倪海夏正宗紫微斗数体系，AI深度解读您的命盘格局、大限流年、感情事业财富健康全方位解析',
   keywords: '紫微斗数, 倪海夏, 倪海厦, 紫微斗数全集, 紫微斗数全书, 骨髓赋, 命盘, 命理, 14主星, 12宫位',
-  metadataBase: new URL('https://wdyziweidoushu666.com'),
+  metadataBase: new URL(siteUrl),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: '紫微命盘 · 倪海夏正宗紫微斗数',
     description: '基于倪海夏正宗紫微斗数体系，AI深度解读您的命盘格局、大限流年、感情事业财富健康全方位解析',
-    url: 'https://wdyziweidoushu666.com',
-    siteName: '紫微研究',
+    url: siteUrl,
+    siteName: '紫微命盘',
     locale: 'zh_CN',
     type: 'website',
   },
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION || undefined,
     // Bing Webmaster Tools: 在 https://www.bing.com/webmasters 添加站点后获取
     other: {
-      'msvalidate.01': process.env.NEXT_PUBLIC_BING_VERIFICATION || '808FFC6023A2C359B375DD860FEDA856',
+      'msvalidate.01': process.env.NEXT_PUBLIC_BING_VERIFICATION || '',
       // 百度站长（等执照下来后）
       'baidu-site-verification': process.env.NEXT_PUBLIC_BAIDU_VERIFICATION || '',
       // 360 站长（等执照下来后）
@@ -45,8 +45,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           {children}
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
       </body>
     </html>
   );

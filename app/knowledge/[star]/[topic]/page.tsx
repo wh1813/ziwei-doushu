@@ -25,6 +25,8 @@ import {
   SLUG_TO_STAR,
 } from '@/lib/seo/knowledge';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
 // 允许动态参数：如果某个 star/topic 组合不在 generateStaticParams 列表中
 // 也允许运行时按需渲染，避免中文 URL 编码问题导致 404
 export const dynamicParams = false;
@@ -53,10 +55,10 @@ export async function generateMetadata({ params }: { params: Promise<{ star: str
       title,
       description,
       type: 'article',
-      url: `https://wdyziweidoushu666.com/knowledge/${slug}/${topic}`,
+      url: `${SITE_URL}/knowledge/${slug}/${topic}`,
     },
     alternates: {
-      canonical: `https://wdyziweidoushu666.com/knowledge/${slug}/${topic}`,
+      canonical: `${SITE_URL}/knowledge/${slug}/${topic}`,
     },
     keywords: [
       '紫微斗数', '倪海夏', star, data.palaceName, data.topicLabel,
@@ -88,11 +90,11 @@ export default async function KnowledgePage({ params }: { params: Promise<{ star
     publisher: {
       '@type': 'Organization',
       name: '紫微研究',
-      url: 'https://wdyziweidoushu666.com',
+      url: SITE_URL,
     },
     datePublished: '2026-04-28',
     dateModified: '2026-04-28',
-    mainEntityOfPage: `https://wdyziweidoushu666.com/knowledge/${slug}/${topic}`,
+    mainEntityOfPage: `${SITE_URL}/knowledge/${slug}/${topic}`,
     articleSection: '紫微斗数 · 倪海夏体系',
     keywords: [`紫微斗数`, star, data.palaceName, data.topicLabel].join(', '),
   };
