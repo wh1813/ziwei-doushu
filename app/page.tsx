@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform, useInView, AnimatePresence } from 'framer-motion';
 import StarField from '@/components/StarField';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
-import AnnouncementModal from '@/components/AnnouncementModal';
 
 // ─── 滚动入场 wrapper ────────────────────────────────────
 function FadeIn({
@@ -113,7 +112,7 @@ const FEATURES = [
   {
     tag: 'AI 解读',
     title: '深度解盘\n不止于算',
-    subtitle: '倪海夏体系知识库 × Claude AI',
+    subtitle: '倪海夏体系知识库 × 智能解读',
     points: [
       '命格分析：从命宫主星出发，结合三方四正，给出全面的性格与人生格局判断',
       '六大维度解读：事业方向、感情婚姻、财运模式、健康注意、家庭关系、子女缘分',
@@ -463,11 +462,7 @@ export default function HomePage() {
   }, [c.bgBase]);
 
   return (
-    <div style={{ background: c.bgBase, transition: 'background 0.35s ease' }} className="overflow-x-hidden">
-      {/* 致用户公告——首次访问全屏覆盖，关闭后才进入首页 */}
-      <AnnouncementModal />
-
-      <StarField />
+    <div style={{ background: c.bgBase, transition: 'background 0.35s ease' }} className="overflow-x-hidden"><StarField />
 
       {/* 全局光晕 */}
       <div className="fixed inset-0 pointer-events-none z-0">

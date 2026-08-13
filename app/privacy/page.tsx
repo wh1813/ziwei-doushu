@@ -39,7 +39,7 @@ export default function PrivacyPage() {
         <li>支付服务商（支付宝 / 微信支付）：处理订单结算</li>
         <li>短信服务商（如阿里云短信）：发送验证码</li>
         <li>云服务商（如 Vercel / Cloudflare / 阿里云）：技术承载</li>
-        <li>AI 解读服务（如 Anthropic Claude）：处理你的"自由追问"对话（已做匿名化）</li>
+        <li>AI 解读服务：处理你的“自由追问”对话与命盘上下文（不要求实名信息）</li>
         <li>司法机关或政府部门基于法律法规的合法要求</li>
       </ul>
 
