@@ -59,4 +59,4 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.example
 > 来源：https://github.com/Renhuai123/ziwei-doushu  
 > 作者：王多鱼AI
 
-代码使用 MIT License；古籍原文属于公有领域。详见 [LICENSE](./LICENSE)。
+代码使用 MIT License；古籍原文属于公有领域。详见 LICENSE。
