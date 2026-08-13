@@ -18,7 +18,7 @@ export function getAiConfig(): AiConfig {
   return {
     baseUrl,
     apiKey,
-    model: process.env.AI_MODEL?.trim() || 'deepseek-chat',
+    model: process.env.AI_MODEL?.trim() || 'deepseek-v4-flash',
     maxOutputTokens: Number.isFinite(maxOutputTokens) ? Math.min(Math.max(maxOutputTokens, 256), 4096) : 1800,
     timeoutMs: Number.isFinite(timeoutMs) ? Math.min(Math.max(timeoutMs, 5000), 120000) : 90000,
   };
