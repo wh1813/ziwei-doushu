@@ -189,7 +189,6 @@ export default function InsightPanel({ chart, selectedPalace, selectedSiHua }: I
   const [activeTopic, setActiveTopic] = useState<string>('overview');
   const messagesRef = useRef<Message[]>([]); // always-current copy for closures
   const loadingRef = useRef(false);
-  const autoLoaded = useRef(false);
   const lastPalaceBranch = useRef<number | undefined>(undefined);
   const lastSiHuaKey = useRef<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -204,13 +203,6 @@ export default function InsightPanel({ chart, selectedPalace, selectedSiHua }: I
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
-
-  // Auto-generate 命格总览 on mount
-  useEffect(() => {
-    if (autoLoaded.current) return;
-    autoLoaded.current = true;
-    sendMessage(TOPIC_PROMPTS.overview, true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Inject palace analysis when palace selected
   useEffect(() => {
@@ -374,11 +366,30 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
       {/* ── Messages ── */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
 
-        {/* Loading state before first message */}
+        {/* Start AI manually so the input never appears frozen on slow networks. */}
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="text-4xl mb-3" style={{ color: 'var(--t-gold)', opacity: 0.1 }}>✦</div>
-            <p className="text-[10px] animate-pulse" style={{ color: 'var(--t-faint)' }}>命格解读生成中…</p>
+          <div className="flex flex-col items-center justify-center h-full min-h-52 text-center px-4">
+            <div className="text-4xl mb-3" style={{ color: 'var(--t-gold)', opacity: 0.16 }}>✦</div>
+            <div className="text-xs font-medium mb-2" style={{ color: 'var(--t-gold)' }}>AI 命盘解读</div>
+            <p className="text-[11px] leading-relaxed mb-4" style={{ color: 'var(--t-faint)' }}>
+              点击下方按钮生成命格总览，或直接在输入框中提问。
+            </p>
+            <button
+              type="button"
+              onClick={() => sendMessage(TOPIC_PROMPTS.overview, true)}
+              disabled={loading}
+              className="px-5 py-2.5 rounded-lg text-xs font-medium disabled:opacity-40"
+              style={{
+                background: 'rgba(212,168,67,0.15)',
+                border: '1px solid rgba(212,168,67,0.3)',
+                color: 'var(--t-gold)',
+              }}
+            >
+              {loading ? '正在解读…' : '开始 AI 解读'}
+            </button>
+            <span className="mt-3 text-[9px]" style={{ color: 'var(--t-faint)', opacity: 0.65 }}>
+              移动端布局 v2
+            </span>
           </div>
         )}
 
@@ -439,7 +450,6 @@ ${selectedSiHua.starName}化${selectedSiHua.siHua}落在【${palaceName}】，�
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder="继续追问，如：今年适合换工作吗？"
-            disabled={loading}
             className="flex-1 rounded-lg px-3 py-2 text-[11px] focus:outline-none transition-colors"
             style={{
               background: 'var(--t-card)',
