@@ -26,6 +26,7 @@ export async function streamChatCompletion(
       body: JSON.stringify({
         model: config.model,
         stream: true,
+        thinking: { type: 'disabled' },
         max_tokens: config.maxOutputTokens,
         temperature: 0.5,
         messages: [
@@ -43,6 +44,7 @@ export async function streamChatCompletion(
 
   if (!upstream.ok || !upstream.body) {
     clearTimeout(timeout);
+    console.error('AI upstream rejected request', upstream.status);
     throw new Error(`AI upstream failed with status ${upstream.status}`);
   }
 
@@ -50,20 +52,32 @@ export async function streamChatCompletion(
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = '';
+  let finished = false;
+
+  const finish = (streamController: ReadableStreamDefaultController<Uint8Array>, message?: string) => {
+    if (finished) return;
+    finished = true;
+    if (message) {
+      streamController.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: { text: message } })}\n\n`));
+    }
+    streamController.enqueue(encoder.encode('data: [DONE]\n\n'));
+    streamController.close();
+    clearTimeout(timeout);
+  };
 
   return new ReadableStream<Uint8Array>({
     async pull(streamController) {
       try {
         const { done, value } = await reader.read();
         if (done) {
-          streamController.enqueue(encoder.encode('data: [DONE]\n\n'));
-          streamController.close();
-          clearTimeout(timeout);
+          finish(streamController);
           return;
         }
+
         buffer += decoder.decode(value, { stream: true });
         const events = buffer.split(/\r?\n\r?\n/);
         buffer = events.pop() || '';
+
         for (const event of events) {
           for (const line of event.split(/\r?\n/)) {
             if (!line.startsWith('data:')) continue;
@@ -72,21 +86,27 @@ export async function streamChatCompletion(
             try {
               const parsed = JSON.parse(data) as StreamChunk;
               const text = parsed.choices?.[0]?.delta?.content;
-              if (text) streamController.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: { text } })}\n\n`));
+              if (text) {
+                streamController.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ delta: { text } })}\n\n`),
+                );
+              }
             } catch {
-              // Skip malformed upstream events without exposing provider details.
+              // Ignore malformed provider events.
             }
           }
         }
       } catch (error) {
-        clearTimeout(timeout);
-        streamController.error(error);
+        console.error('AI response stream ended early', error instanceof Error ? error.message : 'unknown');
+        finish(streamController, '\n\n解读响应超时，请稍后重试。');
       }
     },
-    cancel() {
+    async cancel() {
+      if (finished) return;
+      finished = true;
       clearTimeout(timeout);
       controller.abort();
-      return reader.cancel();
+      await reader.cancel().catch(() => undefined);
     },
   });
 }
