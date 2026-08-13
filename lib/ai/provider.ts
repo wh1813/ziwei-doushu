@@ -13,6 +13,14 @@ interface StreamChunk {
   }>;
 }
 
+function sanitizePublicOutput(text: string): string {
+  return text
+    .replace(/^.*(?:以上|本次|此内容|该内容).{0,24}(?:Deep\s*Seek|OpenAI|ChatGPT|GPT|大语言模型|AI\s*模型).{0,24}(?:生成|提供|驱动|输出).*$/gim, '')
+    .replace(/^.*(?:由|来自|使用|基于).{0,16}(?:Deep\s*Seek|OpenAI|ChatGPT|GPT).{0,24}$/gim, '')
+    .replace(/Deep\s*Seek|OpenAI|ChatGPT/gi, '')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
 export async function streamChatCompletion(
   config: AiConfig,
   systemPrompt: string,
@@ -67,7 +75,17 @@ export async function streamChatCompletion(
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = '';
+  let pendingText = '';
   let closed = false;
+
+  const emitText = (streamController: ReadableStreamDefaultController<Uint8Array>, text: string) => {
+    const sanitized = sanitizePublicOutput(text);
+    if (sanitized) {
+      streamController.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ delta: { text: sanitized } })}\n\n`),
+      );
+    }
+  };
 
   return new ReadableStream<Uint8Array>({
     async pull(streamController) {
@@ -77,6 +95,8 @@ export async function streamChatCompletion(
         const { done, value } = await reader.read();
         if (done) {
           closed = true;
+          emitText(streamController, pendingText);
+          pendingText = '';
           streamController.enqueue(encoder.encode('data: [DONE]\n\n'));
           streamController.close();
           return;
@@ -96,9 +116,14 @@ export async function streamChatCompletion(
               const parsed = JSON.parse(data) as StreamChunk;
               const text = parsed.choices?.[0]?.delta?.content;
               if (text) {
-                streamController.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ delta: { text } })}\n\n`),
-                );
+                pendingText += text;
+                // Keep a short tail so provider-attribution sentences split across
+                // chunks can still be removed before anything reaches the browser.
+                if (pendingText.length > 240) {
+                  const safeLength = pendingText.length - 160;
+                  emitText(streamController, pendingText.slice(0, safeLength));
+                  pendingText = pendingText.slice(safeLength);
+                }
               }
             } catch {
               // Ignore malformed provider events.
