@@ -25,7 +25,7 @@ npm run dev
 ```env
 AI_BASE_URL=https://api.deepseek.com
 AI_API_KEY=your-secret
-AI_MODEL=deepseek-chat
+AI_MODEL=deepseek-v4-flash
 NEXT_PUBLIC_SITE_URL=https://your-domain.example
 ```
 
