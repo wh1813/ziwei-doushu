@@ -37,3 +37,23 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Capture Worker runtime error
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          timeout 30s npx wrangler tail ziwei-doushu --format pretty > worker-tail.log 2>&1 &
+          TAIL_PID=$!
+          sleep 8
+          curl --silent --show-error --max-time 20 --output response.txt --write-out "HTTP %{http_code}\n" https://ziwei-doushu.wanghe3933.workers.dev/ || true
+          sleep 8
+          kill $TAIL_PID 2>/dev/null || true
+          wait $TAIL_PID 2>/dev/null || true
+          echo "===== Worker response ====="
+          head -c 2000 response.txt 2>/dev/null || true
+          echo
+          echo "===== Worker runtime log ====="
+          cat worker-tail.log
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
