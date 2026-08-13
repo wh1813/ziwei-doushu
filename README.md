@@ -60,3 +60,4 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.example
 > 作者：王多鱼AI
 
 代码使用 MIT License；古籍原文属于公有领域。详见 [LICENSE](./LICENSE)。
+<!-- Cloudflare Workers build trigger -->
