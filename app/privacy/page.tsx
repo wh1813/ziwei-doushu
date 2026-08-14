@@ -1,6 +1,7 @@
 export const metadata = { title: '隐私政策 · 紫微命盘', description: '紫微命盘隐私政策' };
 
 export default function PrivacyPage() {
+  const heading = { fontSize: 18, marginTop: 32, marginBottom: 12 };
   return (
     <>
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'var(--bg-0)', borderBottom: '1px solid var(--bdr)', padding: '14px 24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -13,54 +14,40 @@ export default function PrivacyPage() {
       </header>
       <main style={{ maxWidth: 800, margin: '0 auto', padding: '60px 24px 80px', color: 'var(--tx-1)', lineHeight: 1.8 }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 8 }}>隐私政策</h1>
-        <p style={{ fontSize: 12, color: 'var(--tx-3)', marginBottom: 32 }}>最后更新：2026年4月</p>
+        <p style={{ fontSize: 12, color: 'var(--tx-3)', marginBottom: 32 }}>最后更新：2026年8月</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>1. 我们收集的信息</h2>
-      <p>为提供紫微命盘排盘与解读服务，我们可能收集以下信息：</p>
-      <ul style={{ paddingLeft: 24 }}>
-        <li><strong>命盘必要信息</strong>：姓名（选填）、出生公历年月日、出生时辰、性别、出生地经度</li>
-        <li><strong>账号信息（注册后）</strong>：手机号（用于短信验证与会员服务）</li>
-        <li><strong>交互信息</strong>：你在站内的点击、浏览、命盘历史记录</li>
-        <li><strong>反馈信息</strong>：你对解读内容的"准 / 不准"打分与文字反馈</li>
-        <li><strong>支付信息</strong>：购买会员或单项服务时通过第三方支付（支付宝 / 微信支付）处理，本平台不存储完整卡号或密码</li>
-      </ul>
+        <h2 style={heading}>1. 我们处理的信息</h2>
+        <ul style={{ paddingLeft: 24 }}>
+          <li><strong>排盘信息</strong>：出生年月日、出生时辰、性别及排盘结果，用于生成和展示命盘。</li>
+          <li><strong>AI交互记录</strong>：用户问题、AI生成结果、命盘摘要、成功或失败状态与响应耗时。</li>
+          <li><strong>匿名技术信息</strong>：随机会话编号及Cloudflare提供的国家或地区代码。</li>
+        </ul>
+        <p>系统不在询问记录中保存真实IP地址。请勿在问题中输入姓名、身份证号、手机号、住址等可直接识别身份的信息。</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>2. 我们如何使用信息</h2>
-      <ul style={{ paddingLeft: 24 }}>
-        <li>命盘信息仅用于本次解读与你账号下的历史命盘记录</li>
-        <li>手机号用于注册、登录、订单通知</li>
-        <li>反馈信息用于持续改进命理内容质量（脱敏后聚合分析）</li>
-        <li>聚合数据可能用于行业研究与平台优化</li>
-      </ul>
+        <h2 style={heading}>2. 信息用途</h2>
+        <ul style={{ paddingLeft: 24 }}>
+          <li>完成排盘与AI命理解读。</li>
+          <li>查看每次询问是否成功，定位超时与服务错误。</li>
+          <li>在匿名基础上改进回答质量、输入限制和系统稳定性。</li>
+        </ul>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>3. 信息共享与第三方</h2>
-      <p>除以下情形外，我们不会向第三方共享你的个人信息：</p>
-      <ul style={{ paddingLeft: 24 }}>
-        <li>支付服务商（支付宝 / 微信支付）：处理订单结算</li>
-        <li>短信服务商（如阿里云短信）：发送验证码</li>
-        <li>云服务商（如 Vercel / Cloudflare / 阿里云）：技术承载</li>
-        <li>AI 解读服务：处理你的“自由追问”对话与命盘上下文（不要求实名信息）</li>
-        <li>司法机关或政府部门基于法律法规的合法要求</li>
-      </ul>
+        <h2 style={heading}>3. 保存期限</h2>
+        <p>AI询问记录默认保存30天，系统按保留周期自动清理。管理员也可以提前删除单条或批量记录。</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>4. 信息安全</h2>
-      <p>我们采取业界常见的技术与管理手段保护你的信息（HTTPS 传输加密、数据库加密存储、访问权限控制等）。但请注意，互联网传输无法保证 100% 安全。</p>
+        <h2 style={heading}>4. 第三方服务</h2>
+        <p>本站使用Cloudflare承载网站、数据库及安全服务，并将命盘上下文和对话发送给后端配置的AI解读服务。浏览器不会获得AI服务密钥、模型配置或系统提示词。</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>5. 你的权利</h2>
-      <ul style={{ paddingLeft: 24 }}>
-        <li><strong>查询</strong>：可通过账号中心查看你的所有历史命盘与订单</li>
-        <li><strong>删除</strong>：联系客服删除账号下指定命盘 / 注销账号</li>
-        <li><strong>导出</strong>：可申请导出你的全部个人数据</li>
-      </ul>
+        <h2 style={heading}>5. 安全措施</h2>
+        <p>管理后台通过Cloudflare Access限制为指定管理员邮箱，并在应用层再次核对管理员身份。数据库不向浏览器直接开放，记录查询、导出和删除均通过受保护的服务端接口完成。</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>6. Cookie 与本地存储</h2>
-      <p>本站使用 cookie / localStorage 用于：保存你的暗黑/亮色主题偏好、最近的命盘历史、会员登录状态。你可在浏览器设置中关闭，但部分功能可能受影响。</p>
+        <h2 style={heading}>6. Cookie与本地存储</h2>
+        <p>本站使用localStorage保存主题偏好和随机匿名会话编号，以便将同一浏览器中的连续提问归为一个匿名会话。清除浏览器站点数据后会生成新的编号。</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>7. 未成年人</h2>
-      <p>本平台命理内容面向 18 岁以上成年用户。未成年人请在监护人同意下使用，并不得将解读用于重大人生决策。</p>
+        <h2 style={heading}>7. 使用提醒</h2>
+        <p>本站内容用于传统文化研究与休闲参考，不应作为医疗、法律、投资或其他重大决定的唯一依据。未成年人请在监护人同意下使用。</p>
 
-      <h2 style={{ fontSize: 18, marginTop: 32, marginBottom: 12 }}>8. 政策变更</h2>
-      <p>本政策可能不定期更新。重大变更将以显著方式通知。继续使用即表示同意更新后的版本。</p>
+        <h2 style={heading}>8. 政策变更</h2>
+        <p>如记录范围、用途或保存期限发生重大变化，本站将更新本页面并调整最后更新日期。</p>
 
         <p style={{ marginTop: 48, fontSize: 12, color: 'var(--tx-3)' }}>
           <a href="/terms" style={{ color: 'var(--ac)' }}>服务条款</a> · <a href="/" style={{ color: 'var(--ac)' }}>返回首页</a>

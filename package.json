@@ -7,9 +7,10 @@
     "build": "next build",
     "start": "next start",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy -- --keep-vars",
+    "deploy": "node scripts/prepare-cloudflare-config.mjs && wrangler d1 migrations apply QUERY_LOGS_DB --remote --config wrangler.deploy.jsonc && opennextjs-cloudflare build && opennextjs-cloudflare deploy -- --config wrangler.deploy.jsonc --keep-vars",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "prepare:cloudflare": "node scripts/prepare-cloudflare-config.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.2",
