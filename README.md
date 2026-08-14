@@ -10,6 +10,8 @@
 - 命盘上下文整理：程序负责排盘，模型只负责解释
 - SSE 流式回答，不向浏览器暴露供应商、模型、API Key 或系统提示词
 - Cloudflare Workers + OpenNext
+- Cloudflare D1 匿名记录AI提问、回答、状态与耗时，默认保留30天
+- Cloudflare Access 保护的查询记录管理后台
 - Cloudflare 原生每分钟限流，以及请求体、消息轮数、单条内容、输出和超时限制
 
 ## 开始使用
@@ -61,3 +63,52 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.example
 
 代码使用 MIT License；古籍原文属于公有领域。详见 [LICENSE](./LICENSE)。
 <!-- Cloudflare Workers build trigger -->
+
+
+## AI询问记录后台
+
+管理后台地址：
+
+```text
+https://你的域名/admin/query-logs
+```
+
+后台支持按关键词和状态搜索、分页、查看完整回答与命盘摘要、CSV导出及批量删除。记录包含匿名会话编号，不保存真实IP，系统在每次写入时清理30天前的数据。
+
+### 1. 创建D1数据库
+
+在 Cloudflare 控制台进入 **Storage & Databases → D1 SQL Database**，创建：
+
+```text
+ziwei-doushu-logs
+```
+
+数据库 ID 已通过 `wrangler.jsonc` 的 `QUERY_LOGS_DB` 绑定配置。数据库 ID 不是密钥，可以安全提交。部署脚本会在每次生产部署前自动执行 `migrations/0001_ai_query_logs.sql`。
+
+### 2. 配置管理员邮箱
+
+在 Worker 的变量和密钥中添加文本变量：
+
+```text
+ADMIN_EMAILS=你的邮箱
+```
+
+多个管理员邮箱使用英文逗号分隔。
+
+### 3. 使用Cloudflare Access保护后台
+
+在 **Zero Trust → Access controls → Applications** 创建 Self-hosted 应用，只允许管理员邮箱，并保护两个路径：
+
+```text
+你的域名/admin/*
+你的域名/api/admin/*
+```
+
+应用代码要求同时存在 Cloudflare Access JWT 和经过验证的管理员邮箱；未配置 Access 时后台默认拒绝访问。
+
+## 询问记录隐私边界
+
+- 保存用户问题、AI回答、命盘摘要、状态、耗时、国家或地区代码及随机会话编号。
+- 不保存真实IP、API Key、Cookie或完整请求头。
+- 前端明确提示保存范围并链接到隐私政策。
+- 默认保留30天，管理员可提前删除。

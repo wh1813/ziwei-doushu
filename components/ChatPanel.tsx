@@ -26,6 +26,21 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef('');
+
+  useEffect(() => {
+    try {
+      const storageKey = 'ziwei-anonymous-session';
+      let value = localStorage.getItem(storageKey);
+      if (!value) {
+        value = crypto.randomUUID();
+        localStorage.setItem(storageKey, value);
+      }
+      sessionIdRef.current = value;
+    } catch {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -41,10 +56,15 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
     setLoading(true);
 
     try {
+      if (!sessionIdRef.current) sessionIdRef.current = crypto.randomUUID();
       const res = await fetch('/api/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chart, messages: [...messages, userMsg] }),
+        body: JSON.stringify({
+          chart,
+          messages: [...messages, userMsg],
+          sessionId: sessionIdRef.current,
+        }),
       });
 
       if (!res.ok) throw new Error('请求失败');
@@ -204,6 +224,10 @@ export default function ChatPanel({ chart }: ChatPanelProps) {
             解读
           </button>
         </div>
+        <p className="mt-2 text-[9px] leading-relaxed" style={{ color: 'var(--t-faint)' }}>
+          提问、命盘摘要及生成结果将以匿名会话保存30天，用于排障与服务改进。{' '}
+          <a href="/privacy" className="underline hover:opacity-80">查看隐私政策</a>
+        </p>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { buildChartContext, isChartLike } from '@/lib/ai/chart-context';
 import { getAiConfig } from '@/lib/ai/config';
 import { streamChatCompletion, type ChatMessage } from '@/lib/ai/provider';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompt';
+import { writeQueryLog } from '@/lib/logging/query-log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,11 @@ function normalizeMessages(value: unknown): ChatMessage[] | null {
     result.push({ role, content: trimmed });
   }
   return result;
+}
+
+function normalizeSessionId(value: unknown): string {
+  if (typeof value === 'string' && /^[a-zA-Z0-9_-]{8,80}$/.test(value)) return value;
+  return crypto.randomUUID();
 }
 
 async function isRateLimited(request: Request): Promise<boolean> {
@@ -64,13 +70,40 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!body || typeof body !== 'object') return errorResponse('请求格式无效', 400);
-  const { chart, messages } = body as { chart?: unknown; messages?: unknown };
+  const { chart, messages, sessionId } = body as {
+    chart?: unknown;
+    messages?: unknown;
+    sessionId?: unknown;
+  };
   const normalizedMessages = normalizeMessages(messages);
   if (!isChartLike(chart) || !normalizedMessages) return errorResponse('命盘或对话内容无效', 400);
 
+  const startedAt = Date.now();
+  const chartContext = buildChartContext(chart);
+  const question = [...normalizedMessages].reverse().find(message => message.role === 'user')?.content || '';
+  const logId = crypto.randomUUID();
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  const country = request.headers.get('cf-ipcountry');
+
   try {
-    const stream = await streamChatCompletion(getAiConfig(), SYSTEM_PROMPT, buildChartContext(chart), normalizedMessages);
-    return new Response(stream, {
+    const completion = await streamChatCompletion(
+      getAiConfig(),
+      SYSTEM_PROMPT,
+      chartContext,
+      normalizedMessages,
+    );
+    await writeQueryLog({
+      id: logId,
+      sessionId: normalizedSessionId,
+      question,
+      answer: completion.content,
+      chartSummary: chartContext,
+      status: 'success',
+      errorMessage: null,
+      durationMs: Date.now() - startedAt,
+      country,
+    });
+    return new Response(completion.stream, {
       headers: {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -79,7 +112,19 @@ export async function POST(request: Request): Promise<Response> {
       },
     });
   } catch (error) {
-    console.error('AI interpretation request failed', error instanceof Error ? error.message : 'unknown error');
+    const errorMessage = error instanceof Error ? error.message : 'unknown error';
+    await writeQueryLog({
+      id: logId,
+      sessionId: normalizedSessionId,
+      question,
+      answer: null,
+      chartSummary: chartContext,
+      status: 'error',
+      errorMessage,
+      durationMs: Date.now() - startedAt,
+      country,
+    });
+    console.error('AI interpretation request failed', errorMessage);
     return errorResponse('解读服务暂时不可用，请稍后再试', 503);
   }
 }

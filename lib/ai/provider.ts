@@ -5,16 +5,21 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatCompletionResult {
+  content: string;
+  stream: ReadableStream<Uint8Array>;
+}
+
 interface CompletionResponse {
   choices?: Array<{ message?: { content?: string | null } }>;
 }
 
 function sanitizePublicOutput(text: string): string {
   return text
-    .replace(/^.*(?:以上|本次|此内容|该内容).{0,32}(?:Deep\\s*Seek|OpenAI|ChatGPT|GPT|大语言模型|AI\\s*模型).{0,32}(?:生成|提供|驱动|输出).*$/gim, '')
-    .replace(/^.*(?:由|来自|使用|基于).{0,20}(?:Deep\\s*Seek|OpenAI|ChatGPT).{0,32}$/gim, '')
-    .replace(/Deep\\s*Seek|OpenAI|ChatGPT/gi, '')
-    .replace(/\\n{3,}/g, '\\n\\n')
+    .replace(/^.*(?:以上|本次|此内容|该内容).{0,32}(?:Deep\s*Seek|OpenAI|ChatGPT|GPT|大语言模型|AI\s*模型).{0,32}(?:生成|提供|驱动|输出).*$/gim, '')
+    .replace(/^.*(?:由|来自|使用|基于).{0,20}(?:Deep\s*Seek|OpenAI|ChatGPT).{0,32}$/gim, '')
+    .replace(/Deep\s*Seek|OpenAI|ChatGPT/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -23,7 +28,7 @@ export async function streamChatCompletion(
   systemPrompt: string,
   chartContext: string,
   messages: ChatMessage[],
-): Promise<ReadableStream<Uint8Array>> {
+): Promise<ChatCompletionResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
@@ -61,7 +66,7 @@ export async function streamChatCompletion(
     if (!content) throw new Error('AI response was removed by output policy');
 
     const encoder = new TextEncoder();
-    return new ReadableStream<Uint8Array>({
+    const stream = new ReadableStream<Uint8Array>({
       start(streamController) {
         streamController.enqueue(
           encoder.encode(`data: ${JSON.stringify({ delta: { text: content } })}\n\n`),
@@ -70,6 +75,8 @@ export async function streamChatCompletion(
         streamController.close();
       },
     });
+
+    return { content, stream };
   } catch (error) {
     const message = error instanceof Error && error.name === 'AbortError'
       ? 'AI upstream timed out'
