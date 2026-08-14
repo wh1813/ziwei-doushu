@@ -3,7 +3,9 @@
   "name": "ziwei-doushu",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-13",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -12,8 +14,21 @@
     {
       "name": "AI_RATE_LIMITER",
       "namespace_id": "1001",
-      "simple": { "limit": 10, "period": 60 }
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
     }
   ],
-  "observability": { "enabled": true }
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "QUERY_LOGS_DB",
+      "database_name": "ziwei-doushu-logs",
+      "database_id": "c76dec00-cf92-404f-acfb-891a04212bb6",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

@@ -83,13 +83,7 @@ https://你的域名/admin/query-logs
 ziwei-doushu-logs
 ```
 
-复制数据库 ID，并分别添加到 GitHub Actions Secret 以及 Cloudflare Workers Builds 的构建变量：
-
-```text
-CLOUDFLARE_D1_DATABASE_ID
-```
-
-部署脚本会生成临时 Wrangler 配置并自动执行 `migrations/0001_ai_query_logs.sql`。临时配置不会提交到仓库。
+数据库 ID 已通过 `wrangler.jsonc` 的 `QUERY_LOGS_DB` 绑定配置。数据库 ID 不是密钥，可以安全提交。部署脚本会在每次生产部署前自动执行 `migrations/0001_ai_query_logs.sql`。
 
 ### 2. 配置管理员邮箱
 
