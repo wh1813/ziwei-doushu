@@ -1,193 +1,175 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { extractPalmFeatures } from '@/lib/ai/palm-vision';
-import { generatePalmReport, type ReportInput } from '@/lib/ai/palm-report';
-import { getPalmAiConfig } from '@/lib/ai/palm-config';
-import { insertPalmRecord } from '@/lib/db/palm-records';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+// 优先采用免费层最新主力模型，遇到高负载自动降级
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash-latest'
+];
 
-/**
- * 手相照片上传 + R2 存储 + 视觉特征提取 + Vectorize RAG + 报告生成 + D1 落库
- *
- * 架构对齐现有 /api/interpret：
- *  - 通过 getCloudflareContext() 读取 R2 / D1 / Vectorize / AI 绑定
- *  - API Key、模型、Base URL 全部服务端配置，前端不暴露任何供应商与凭据
- *  - 请求体大小、Base64 长度、单条提问长度做白名单式硬限制
- *
- * 请求体：
- *   { imageBase64, userQuery?, userId?, handSide? }
- *   imageBase64  必填，data:image/...;base64, 或纯净 base64
- *   userQuery    选填，用户提问 / 关注维度
- *   userId       选填，默认 anonymous，用于历史记录关联
- *   handSide     选填，'left' | 'right'，默认 'right'
- */
-export async function POST(request: Request): Promise<Response> {
-  const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5MB，含 base64 膨胀后的图片
-  const MAX_BASE64_CHARS = 4 * 1024 * 1024; // 单张图 base64 上限
-  const MAX_QUERY_CHARS = 1000;
+// 获取环境变量与资源绑定
+function getEnv(key: string): string | undefined {
+  const env = (process as any).env || {};
+  const globalEnv = (globalThis as any) || {};
+  return env[key] || globalEnv[key] || process.env[key];
+}
 
-  const contentLength = Number(request.headers.get('content-length') || '0');
-  if (contentLength > MAX_BODY_BYTES) return errorResponse('请求内容过大', 413);
-  if (!request.headers.get('content-type')?.toLowerCase().includes('application/json')) {
-    return errorResponse('仅支持 JSON 请求', 415);
-  }
-
-  if (await isRateLimited(request)) return errorResponse('请求过于频繁，请稍后再试', 429);
-
-  let body: unknown;
-  try {
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return errorResponse('请求内容过大', 413);
-    body = JSON.parse(raw);
-  } catch {
-    return errorResponse('请求格式无效', 400);
-  }
-
-  if (!body || typeof body !== 'object') return errorResponse('请求格式无效', 400);
-  const { imageBase64, userQuery, userId, handSide } = body as {
-    imageBase64?: unknown;
-    userQuery?: unknown;
-    userId?: unknown;
-    handSide?: unknown;
-  };
-
-  if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
-    return errorResponse('请上传手掌照片', 400);
-  }
-  if (imageBase64.length > MAX_BASE64_CHARS) return errorResponse('图片过大', 413);
-
-  const normalizedQuery =
-    typeof userQuery === 'string' && userQuery.trim().length > 0 && userQuery.trim().length <= MAX_QUERY_CHARS
-      ? userQuery.trim()
-      : '综合运势';
-  const normalizedUserId =
-    typeof userId === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(userId) ? userId : 'anonymous';
-
-  const { env } = getCloudflareContext();
-  const cfg = getPalmAiConfig(env as unknown as Record<string, unknown>);
-  if (!cfg.geminiApiKey || !cfg.deepseekApiKey) {
-    return errorResponse('AI 服务尚未配置完成，请稍后再试', 503);
-  }
-
-  try {
-    // ---------- 阶段 1：解码并写入 R2 ----------
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    const imageBytes = base64ToBytes(cleanBase64);
-    const recordId = crypto.randomUUID();
-    const mime = detectMime(imageBase64);
-    const imageKey = `palms/${normalizedUserId}/${recordId}.${mime === 'image/png' ? 'png' : 'jpg'}`;
-
-    await env.PALM_IMAGES_BUCKET.put(
-      imageKey,
-      new Uint8Array(imageBytes),
-      { httpMetadata: { contentType: mime } },
-    );
-
-    // ---------- 阶段 2：视觉特征提取（Gemini） ----------
-    const extractedFeatures = await extractPalmFeatures({
-      apiKey: cfg.geminiApiKey,
-      model: cfg.geminiModel,
-      imageBase64: cleanBase64,
-      mimeType: mime,
-      handSide: handSide === 'left' ? '左手' : '右手',
+// 避让重试请求
+async function fetchGeminiWithRetry(url: string, body: any, maxRetries = 2): Promise<Response> {
+  let lastResponse: Response | null = null;
+  for (let i = 0; i <= maxRetries; i++) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
 
-    // ---------- 阶段 3：RAG 知识增强 ----------
-    const ragContext = await queryPalmKnowledge(env, extractedFeatures);
+    // 若非 503 / 429 错误，直接返回
+    if (res.status !== 503 && res.status !== 429) {
+      return res;
+    }
 
-    // ---------- 阶段 4：报告生成（DeepSeek，OpenAI-compatible 流式） ----------
-    const reportInput: ReportInput = {
-      baseUrl: cfg.deepseekBaseUrl,
-      apiKey: cfg.deepseekApiKey,
-      model: cfg.deepseekModel,
-      features: extractedFeatures,
-      ragContext,
-      userQuery: normalizedQuery,
+    lastResponse = res;
+    // 遇到限流或高负载，避让 1.2s ~ 2.4s 后重试
+    if (i < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, 1200 * (i + 1)));
+    }
+  }
+  return lastResponse!;
+}
+
+// 调用 Gemini 进行手相视觉识别
+async function analyzeImageWithGemini(apiKey: string, base64Data: string, mimeType: string, promptText: string) {
+  let lastError = '';
+
+  for (const model of GEMINI_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [
+        {
+          parts: [
+            { text: promptText },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json"
+      }
     };
-    const reportContent = await generatePalmReport(reportInput);
 
-    // ---------- 阶段 5：写入 D1 ----------
-    await insertPalmRecord(env, {
-      id: recordId,
-      userId: normalizedUserId,
-      imageKey,
-      imageUrl: `/api/palm-image/${imageKey}`,
-      extractedFeatures,
-      reportContent,
+    try {
+      const response = await fetchGeminiWithRetry(url, payload);
+      if (response.ok) {
+        const json = await response.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          return JSON.parse(text);
+        }
+      } else {
+        const errorText = await response.text();
+        lastError = `[${model}] 状态码 ${response.status}: ${errorText}`;
+      }
+    } catch (err: any) {
+      lastError = `[${model}] 请求异常: ${err?.message}`;
+    }
+  }
+
+  throw new Error(`所有 Gemini 免费模型调用均繁忙，最后错误: ${lastError}`);
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const apiKey = getEnv('PALM_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY');
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'AI 服务尚未配置完成（缺少 Gemini API Key），请稍后再试' },
+        { status: 500 }
+      );
+    }
+
+    const body = await request.json();
+    const { image, handSide = 'right', userId = 'anonymous' } = body;
+
+    if (!image) {
+      return NextResponse.json(
+        { error: '请上传手掌照片' },
+        { status: 400 }
+      );
+    }
+
+    // 提取 Base64 编码与 MIME 类型
+    let mimeType = 'image/jpeg';
+    let base64Data = image;
+
+    if (image.startsWith('data:')) {
+      const parts = image.split(',');
+      const match = parts[0].match(/:(.*?);/);
+      if (match) mimeType = match[1];
+      base64Data = parts[1];
+    }
+
+    const prompt = `你是一位精通相术与中国传统手相学的专家。请仔细观察这张手掌图像（当前检测为${handSide === 'left' ? '左手' : '右手'}）。
+请严格以 JSON 格式输出以下结构，不要输出任何额外的 Markdown 代码块或文字：
+{
+  "handType": "手型分类（金/木/水/火/土型掌）",
+  "palmFeatures": {
+    "lifeLine": "生命线特征（长度、深浅、起点、有无岛纹/分叉）",
+    "headLine": "智慧线特征（走势、弯度、清晰度）",
+    "heartLine": "感情线特征（平直/上扬、起点、分叉）",
+    "fateLine": "事业线特征（有无、深浅、起点）",
+    "sunLine": "太阳线/成功线特征",
+    "mounts": "各大掌丘饱满程度简析（如木星丘、金星丘等）"
+  },
+  "overallAnalysis": "综合气色、骨相与整体运势特征概述",
+  "fortuneAnalysis": {
+    "career": "事业与财运走向",
+    "relationship": "情感与婚姻分析",
+    "health": "精力与健康提示",
+    "advice": "修身立业与趋吉避凶建议"
+  }
+}`;
+
+    // 执行视觉识别
+    const analysisResult = await analyzeImageWithGemini(apiKey, base64Data, mimeType, prompt);
+
+    // 尝试持久化到 Cloudflare D1 数据库（若绑定存在）
+    const db = (process as any).env?.QUERY_LOGS_DB || (globalThis as any).QUERY_LOGS_DB;
+    if (db) {
+      try {
+        const recordId = crypto.randomUUID();
+        await db.prepare(`
+          INSERT INTO palm_records (id, user_id, extracted_features, report_content, hand_side, created_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now'))
+        `).bind(
+          recordId,
+          userId,
+          JSON.stringify(analysisResult.palmFeatures),
+          JSON.stringify(analysisResult),
+          handSide
+        ).run();
+      } catch (dbErr) {
+        console.warn('D1 写入手相记录失败 (跳过):', dbErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: analysisResult
     });
 
-    return Response.json(
-      {
-        success: true,
-        recordId,
-        imageUrl: `/api/palm-image/${imageKey}`,
-        features: extractedFeatures,
-        report: reportContent,
-      },
-      { headers: { 'Cache-Control': 'no-store' } },
+  } catch (error: any) {
+    console.error('手相分析错误:', error);
+    return NextResponse.json(
+      { error: error?.message || '视觉识别服务繁忙，请稍后重试' },
+      { status: 500 }
     );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : '服务器处理失败';
-    return errorResponse(message, 500);
-  }
-}
-
-function errorResponse(message: string, status: number): Response {
-  return Response.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
-}
-
-function detectMime(base64: string): string {
-  const match = /^data:(image\/[\w.+-]+);base64,/.exec(base64);
-  return match ? match[1] : 'image/jpeg';
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  // 兼容 Node/Bun 运行时
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(b64, 'base64');
-  }
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
-async function isRateLimited(request: Request): Promise<boolean> {
-  try {
-    const { env } = getCloudflareContext();
-    const limiter = (env as unknown as { AI_RATE_LIMITER?: { limit(o: { key: string }): Promise<{ success: boolean }> } })
-      .AI_RATE_LIMITER;
-    if (!limiter) return false;
-    const key = request.headers.get('cf-connecting-ip') || 'unknown';
-    return !(await limiter.limit({ key })).success;
-  } catch {
-    return false;
-  }
-}
-
-async function queryPalmKnowledge(
-  env: unknown,
-  text: string,
-): Promise<string> {
-  try {
-    const e = env as {
-      AI?: { run(model: string, input: { text: string }): Promise<{ data: number[][] }> };
-      HAND_KNOWLEDGE_INDEX?: {
-        query(vector: number[], opts: { topK: number }): Promise<{ matches: { metadata?: { text?: string } }[] }>;
-      };
-    };
-    if (!e.AI || !e.HAND_KNOWLEDGE_INDEX) return '';
-    const { data } = await e.AI.run('@cf/baai/bge-base-zh', { text });
-    const vector = data[0];
-    const { matches } = await e.HAND_KNOWLEDGE_INDEX.query(vector, { topK: 3 });
-    return matches
-      .map((m) => m.metadata?.text)
-      .filter(Boolean)
-      .map((t) => `- ${t}`)
-      .join('\n');
-  } catch {
-    // RAG 失败不应阻断主流程，退化为仅以视觉特征生成报告
-    return '';
   }
 }
