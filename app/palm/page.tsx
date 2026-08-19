@@ -1,267 +1,286 @@
-'use client';
-import { useCallback, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import StarField from '@/components/StarField';
-import { useTheme } from '@/components/ThemeProvider';
+"use client";
 
-// 与 app/page.tsx 一致的配色工具
-function useColors(theme: string) {
-  const d = theme === 'dark';
-  return {
-    bgBase: d ? '#020810' : '#f5efe0',
-    cardBg: d ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.88)',
-    cardBorder: d ? 'rgba(255,255,255,0.10)' : 'rgba(200,160,60,0.25)',
-    goldLine: d ? 'rgba(212,168,67,0.4)' : 'rgba(140,100,20,0.4)',
-    goldSolid: d ? '#d4a843' : '#8b6410',
-    textPrimary: d ? '#e8eef6' : '#1a1d24',
-    textSecond: d ? '#b8c6df' : '#3a3f4a',
-    textMuted: d ? '#9db0d0' : '#5a6275',
-    ctaBg: d
-      ? 'linear-gradient(135deg,#b8892a,#f0d070,#b8892a)'
-      : 'linear-gradient(135deg,#6a4206,#9a6810,#6a4206)',
-    ctaText: d ? '#08080a' : '#f8f3e8',
-    navBorder: d ? 'rgba(255,255,255,0.05)' : 'rgba(160,120,30,0.15)',
-    footerText: d ? 'rgba(255,255,255,0.08)' : '#c0a870',
-  };
-}
-
-interface AnalyzeResult {
-  success: boolean;
-  recordId?: string;
-  imageUrl?: string;
-  features?: string;
-  report?: string;
-  error?: string;
-}
-
-interface HistoryItem {
-  id: string;
-  image_url: string;
-  extracted_features: string;
-  report_content: string;
-  created_at: string;
-}
+import React, { useState, useRef } from "react";
+import Link from "next/link";
 
 export default function PalmPage() {
-  const router = useRouter();
-  const { theme } = useTheme();
-  const c = useColors(theme);
-
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [hand, setHand] = useState('right');
-  const [query, setQuery] = useState('综合运势');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [base64Image, setBase64Image] = useState<string | null>(null);
+  const [handSide, setHandSide] = useState<"left" | "right">("right");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalyzeResult | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 客户端压缩图片为 base64
-  const readFileAndResize = useCallback((file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const max = 900;
-          let { width, height } = img;
-          const scale = Math.min(1, max / Math.max(width, height));
-          width = Math.round(width * scale);
-          height = Math.round(height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = reject;
-        img.src = String(reader.result);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }, []);
-
-  const handleFile = useCallback(async (file: File) => {
-    setPreview(URL.createObjectURL(file));
-    setResult(null);
-    setHistory([]);
-    try {
-      const b64 = await readFileAndResize(file);
-      localStorage.setItem('palm_last_image', b64);
-    } catch (err) {
-      setError(String(err));
-    }
-  }, [readFileAndResize]);
-
-  const handleAnalyze = useCallback(async () => {
-    const file = fileRef.current?.files?.[0];
+  // 压缩图片并转为 Base64，避免大图导致传输卡死
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setErrorMsg(null);
+    const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("请上传有效的图片文件 (JPG/PNG/WEBP)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // 限制最大宽度/高度为 1200px，既清晰又极度轻量
+        const MAX_SIZE = 1200;
+        if (width > height && width > MAX_SIZE) {
+          height = Math.round((height * MAX_SIZE) / width);
+          width = MAX_SIZE;
+        } else if (height > MAX_SIZE) {
+          width = Math.round((width * MAX_SIZE) / height);
+          height = MAX_SIZE;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        setImagePreview(compressedDataUrl);
+        setBase64Image(compressedDataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleStartAnalyze = async () => {
+    if (!base64Image) {
+      setErrorMsg("请先点击上方区域上传一张清晰的手掌照片！");
+      return;
+    }
+
     setLoading(true);
-    setError(null);
+    setErrorMsg(null);
     setResult(null);
+
     try {
-      const imageBase64 = await readFileAndResize(file);
-      const res = await fetch('/api/analyze-palm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64, userQuery: query, userId: 'demo-user', handSide: hand }),
+      const res = await fetch("/api/analyze-palm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: base64Image,
+          handSide: handSide,
+          userId: "web-user",
+        }),
       });
-      const data = (await res.json()) as AnalyzeResult;
-      if (data.success) {
-        setResult(data);
-      } else {
-        setError(data.error || '分析失败');
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "分析失败，请稍后重试");
       }
-    } catch (err) {
-      setError(String(err));
+
+      setResult(data.data);
+    } catch (err: any) {
+      setErrorMsg(err.message || "请求服务器失败，请检查网络连接");
     } finally {
       setLoading(false);
     }
-  }, [query, hand, readFileAndResize]);
-
-  const loadHistory = useCallback(async () => {
-    const res = await fetch('/api/palm-history/demo-user');
-    const data = (await res.json()) as { success: boolean; history: HistoryItem[] };
-    if (data.success) setHistory(data.history);
-  }, []);
+  };
 
   return (
-    <div style={{ background: c.bgBase, transition: 'background 0.35s ease' }} className="min-h-screen overflow-x-hidden">
-      <StarField />
-      {/* 顶部导航 */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-2"
-        style={{ background: c.bgBase }}>
-        <button onClick={() => router.push('/')}
-          className="text-[11px] sm:text-xs tracking-[0.3em] font-medium"
-          style={{ color: c.goldSolid, background: 'none', border: 'none', cursor: 'pointer' }}>
-          ← 返回
-        </button>
-        <div className="text-[11px] sm:text-xs tracking-[0.3em] font-medium" style={{ color: c.goldSolid }}>
-          手相分析
-        </div>
-        <div className="w-14" />
-      </nav>
-
-      <div className="relative z-10 max-w-2xl mx-auto px-6 pt-24 pb-16">
-        {/* 标题 */}
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="h-px w-10" style={{ background: `linear-gradient(to right, transparent, ${c.goldLine})` }} />
-            <span className="text-[10px] tracking-[0.4em]" style={{ color: c.goldSolid, opacity: 0.7 }}>Palmistry</span>
-            <div className="h-px w-10" style={{ background: `linear-gradient(to left, transparent, ${c.goldLine})` }} />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-wide mb-3" style={{ color: c.textPrimary }}>
-            手相分析
-          </h1>
-          <p className="text-sm" style={{ color: c.textMuted }}>
-            上传手掌照片，AI 识别掌纹并解读性格、事业与感情
-          </p>
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
+      <div className="max-w-3xl mx-auto">
+        {/* 顶部导航 */}
+        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+          <Link href="/" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
+            ← 返回首页
+          </Link>
+          <h1 className="text-xl font-bold tracking-wider text-amber-400">AI 智能相术 · 手相分析</h1>
+          <div className="w-12"></div>
         </div>
 
-        {/* 上传区 */}
-        <div className="rounded-2xl p-6 md:p-8 mb-6"
-          style={{ background: c.cardBg, border: `1px solid ${c.cardBorder}` }}>
+        {/* 主输入区域 */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8">
+          {/* 上传区域 */}
           <div
-            onClick={() => fileRef.current?.click()}
-            className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-10 cursor-pointer transition-colors"
-            style={{ borderColor: c.goldLine }}>
-            {preview ? (
-              <img src={preview} alt="手相预览" className="w-44 h-auto rounded-lg" />
-            ) : (
-              <>
-                <div className="text-4xl mb-3">✋</div>
-                <div className="text-sm mb-1" style={{ color: c.textSecond }}>点击上传手掌照片</div>
-                <div className="text-[11px]" style={{ color: c.textMuted }}>支持 JPG / PNG</div>
-              </>
-            )}
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-slate-700 hover:border-amber-500 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-950/50 relative overflow-hidden group min-h-[220px] flex flex-col items-center justify-center"
+          >
             <input
-              ref={fileRef}
               type="file"
-              accept="image/jpeg,image/png"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/*"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
             />
+
+            {imagePreview ? (
+              <div className="relative w-full max-h-80 flex flex-col items-center justify-center">
+                <img
+                  src={imagePreview}
+                  alt="手掌预览"
+                  className="max-h-72 object-contain rounded-lg shadow-md"
+                />
+                <p className="text-xs text-amber-400 mt-2">✓ 照片已加载（点击可重新上传更换）</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="w-14 h-14 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  ✋
+                </div>
+                <div className="text-sm font-medium text-slate-300">
+                  点击拍照或上传手掌照片
+                </div>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                  请掌心朝上、五指自然伸展、光线均匀，避免反光或模糊
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* 惯用手 & 提问 */}
-          <div className="mt-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs" style={{ color: c.textMuted }}>分析：</span>
-              {['right', 'left'].map((h) => (
-                <button key={h}
-                  onClick={() => setHand(h)}
-                  className="text-xs px-3 py-1.5 rounded-full"
-                  style={{
-                    border: `1px solid ${hand === h ? c.goldSolid : c.cardBorder}`,
-                    color: hand === h ? c.goldSolid : c.textMuted,
-                    background: hand === h ? 'rgba(212,168,67,0.1)' : 'transparent',
-                  }}>
-                  {h === 'right' ? '右手' : '左手'}
-                </button>
-              ))}
+          {/* 惯用手选择 */}
+          <div className="mt-6 flex items-center justify-between bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <span className="text-sm font-medium text-slate-300">当前检测手掌：</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setHandSide("left")}
+                className={`px-4 py-2 text-sm rounded-lg border transition-all ${
+                  handSide === "left"
+                    ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                    : "border-slate-700 hover:bg-slate-800 text-slate-400"
+                }`}
+              >
+                左手 (先天根基)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHandSide("right")}
+                className={`px-4 py-2 text-sm rounded-lg border transition-all ${
+                  handSide === "right"
+                    ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
+                    : "border-slate-700 hover:bg-slate-800 text-slate-400"
+                }`}
+              >
+                右手 (后天修为)
+              </button>
             </div>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="想关注的事业、感情、财运…（可留空）"
-              className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none"
-              style={{ borderColor: c.cardBorder, background: 'transparent', color: c.textPrimary }}
-            />
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="w-full py-3 rounded-full font-medium text-sm tracking-widest disabled:opacity-50"
-              style={{ background: c.ctaBg, color: c.ctaText }}>
-              {loading ? '分析中…' : '开始分析'}
-            </button>
           </div>
+
+          {/* 错误提示 */}
+          {errorMsg && (
+            <div className="mt-4 p-3 bg-red-950/50 border border-red-800 text-red-300 text-sm rounded-xl text-center">
+              ⚠️ {errorMsg}
+            </div>
+          )}
+
+          {/* 提交分析按钮 */}
+          <button
+            type="button"
+            onClick={handleStartAnalyze}
+            disabled={loading || !base64Image}
+            className={`w-full mt-6 py-3.5 rounded-xl font-bold text-base transition-all ${
+              loading
+                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                : !base64Image
+                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
+            }`}
+          >
+            {loading ? "正在深度识别掌纹与气色特征，请稍候..." : "开始相术分析"}
+          </button>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-300 p-3 text-sm text-red-700">{error}</div>
-        )}
-
-        {/* 结果区 */}
-        {result?.report && (
-          <div className="rounded-2xl p-6 mb-6"
-            style={{ background: c.cardBg, border: `1px solid ${c.cardBorder}` }}>
-            <h2 className="text-lg font-semibold mb-3" style={{ color: c.textPrimary }}>分析报告</h2>
-            <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: c.textSecond }}>
-              {result.report}
+        {/* 报告展示区域 */}
+        {result && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2">
+                <span>📜</span> 手相综合鉴析报告
+              </h2>
+              {result.handType && (
+                <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold rounded-full">
+                  {result.handType}
+                </span>
+              )}
             </div>
-          </div>
-        )}
 
-        {/* 历史入口 */}
-        <button onClick={loadHistory}
-          className="w-full py-2.5 rounded-full border text-sm tracking-widest"
-          style={{ borderColor: c.cardBorder, color: c.textMuted }}>
-          查看历史记录
-        </button>
+            {/* 总体格局 */}
+            {result.overallAnalysis && (
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="text-xs text-slate-400 font-semibold mb-1">【气色与骨相格局】</div>
+                <p className="text-sm text-slate-200 leading-relaxed">{result.overallAnalysis}</p>
+              </div>
+            )}
 
-        {history.length > 0 && (
-          <div className="mt-4 space-y-3">
-            {history.map((h) => (
-              <div key={h.id} className="rounded-lg p-4"
-                style={{ background: c.cardBg, border: `1px solid ${c.cardBorder}` }}>
-                <div className="text-[11px]" style={{ color: c.textMuted }}>{h.created_at}</div>
-                <div className="mt-1 text-sm" style={{ color: c.textSecond }}>
-                  {h.report_content?.slice(0, 120)}…
+            {/* 核心掌纹特征 */}
+            {result.palmFeatures && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {result.palmFeatures.lifeLine && (
+                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs font-bold text-emerald-400 mb-1">生命线 (地纹)</div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.lifeLine}</p>
+                  </div>
+                )}
+                {result.palmFeatures.headLine && (
+                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs font-bold text-blue-400 mb-1">智慧线 (人纹)</div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.headLine}</p>
+                  </div>
+                )}
+                {result.palmFeatures.heartLine && (
+                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs font-bold text-rose-400 mb-1">感情线 (天纹)</div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.heartLine}</p>
+                  </div>
+                )}
+                {result.palmFeatures.fateLine && (
+                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs font-bold text-purple-400 mb-1">事业线 / 运势线</div>
+                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.fateLine}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 四维流年运势分析 */}
+            {result.fortuneAnalysis && (
+              <div className="space-y-3">
+                <div className="text-sm font-bold text-amber-300">【四维运势精解】</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {result.fortuneAnalysis.career && (
+                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="text-xs font-semibold text-slate-400 mb-1">💼 事业财禄</div>
+                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.career}</div>
+                    </div>
+                  )}
+                  {result.fortuneAnalysis.relationship && (
+                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="text-xs font-semibold text-slate-400 mb-1">❤️ 婚姻情感</div>
+                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.relationship}</div>
+                    </div>
+                  )}
+                  {result.fortuneAnalysis.health && (
+                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="text-xs font-semibold text-slate-400 mb-1">🩺 气血健康</div>
+                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.health}</div>
+                    </div>
+                  )}
+                  {result.fortuneAnalysis.advice && (
+                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="text-xs font-semibold text-amber-400 mb-1">💡 趋吉避凶建议</div>
+                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.advice}</div>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
-
-      {/* 底部说明 */}
-      <footer className="relative z-10 py-6 px-6 text-center" style={{ borderTop: `1px solid ${c.navBorder}` }}>
-        <p className="text-[10px] tracking-wider" style={{ color: c.footerText }}>
-          手相分析仅供娱乐参考 · 不构成任何专业建议
-        </p>
-      </footer>
     </div>
   );
 }
