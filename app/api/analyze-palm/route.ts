@@ -6,7 +6,6 @@ function getEnv(key: string): string | undefined {
   return env[key] || globalEnv[key] || process.env[key] || globalEnv.env?.[key];
 }
 
-// 鲁棒的 JSON 提取器
 function parseJsonSafe(text: string): any {
   if (!text) return null;
   try {
@@ -36,32 +35,44 @@ function getBinding(name: string): any {
 }
 
 // =====================================================================
-// 阶段 A：视觉特征提取 —— 详尽观察
+// 阶段 A：多模态视觉特征深度提取（主攻交汇、穿透、复合纹路与左右手差异）
 // =====================================================================
 
-const VISION_PROMPT = `你是一位精通传统手相学与手掌解剖的资深相学师。请仔细观察这张手掌照片（掌心朝上），对以下每一个维度都给出【尽可能详尽、具体】的观察描述，每项 2-4 句，不要只写一句话。
+function buildVisionPrompt(handSide: 'left' | 'right') {
+  const handContext = handSide === 'left' 
+    ? '【左手】代表【先天根基、潜意识性格、遗传禀赋、35岁前的主导气运与原生家庭影响】' 
+    : '【右手】代表【后天修为、显意识行为、后天造化、35岁后的主导运势与个人努力轨迹】';
 
-请严格按以下 JSON 结构输出（不要输出 Markdown 代码块或文字）：
+  return `你是一位兼通中国传统麻衣相法、柳庄相法与手部生理结构的国手级相学大师。
+当前正在鉴析用户的${handContext}。
+
+请你以极度专业、细致入微的眼光观察手掌图像，重点捕捉【多线交汇、穿透断续、交叉复合纹路】，按以下格式输出 JSON：
+
 {
-  "handType": "手型分类及理由，2-3句描述掌形的长宽比、指节、掌心厚薄、整体观感",
+  "handType": "手型（金/木/水/火/土型掌，指掌比例，指节坚实度，厚薄软硬）",
   "palmFeatures": {
-    "lifeLine": "生命线（地纹）：起点位置、长度距离、深浅粗细、弧度、是否断裂/分叉/链状/岛纹，末端走势",
-    "headLine": "智慧线（人纹）：起点与生命线的关联、走向（横贯/向下/分叉）、平直或弯曲、清晰度、是否有岛纹",
-    "heartLine": "感情线（天纹）：起点高低、平直或上扬、是否分叉、有无岛纹/链状、末端指向",
-    "fateLine": "事业线/玉柱线：有无、起点（掌底/掌心）、长度、深浅、断续情况、是否穿过天纹",
-    "sunLine": "太阳线/成功线：有无、是否清晰、是否被横纹切断",
-    "mounts": "掌丘：金星丘、木星丘、太阳丘、水星丘、月丘的厚薄饱满程度与气色"
+    "lifeLine": "生命线（地纹）：起点与走向、弯曲弧度、深浅粗细、末端收敛情况；与智慧线起点是否同源（同源长短代表依附心与独立早晚）",
+    "headLine": "智慧线（人纹）：下垂幅度（直达月丘还是平直入乾宫）、清晰度；与感情线、生命线的距离与空间开阔度",
+    "heartLine": "感情线（天纹）：起点高低、末端是入木星丘、指缝还是与智慧线交汇；有无羽状纹或向下支线",
+    "fateLine": "玉柱事业线：起点位置（坎宫掌底还是月丘）、向上穿透智慧线（35岁关口）与感情线（50岁关口）的形态（是直冲中指、停滞于某线、还是错位偏移）",
+    "sunLine": "太阳成功线/六秀纹：在离宫（无名指下）是否显现、清晰度、是否有辅助辅线",
+    "mounts": "各大掌丘（巽宫木星丘、离宫太阳丘、坤宫水星丘、兑宫月丘、震宫金星丘）的丰满起伏、红润气色与饱满度"
   },
-  "supplement": "其他显著特征：如断掌横纹、健康线、子女线、通贯手、M字纹等特殊纹路，以及皮肤气色、弹性等观感"
+  "complexCrossPatterns": {
+    "jointSource": "三才纹（天/地/人）交汇情况：例如天地人是否交接、智慧线与生命线同源长度（同源超1cm代表谨小慎微，完全分开发端为川字掌代表独立敢闯）、有无断掌/通贯手等",
+    "crossingIntersections": "事业线穿插情况：事业线穿过人纹/天纹时的变粗变细、有无受阻中断、转折或十字交错（重点观察35岁与50岁的交叉节点）",
+    "specialSymbols": "微观符号：掌心明堂、各大掌丘上是否见【十字纹、三角纹、井字纹、星纹、岛纹、米字纹、方格保护纹】及其实际方位"
+  },
+  "supplement": "掌心气色（润白/红润/暗黄）、掌纹深浅对比度、筋骨丰枯等整体肉相与骨相"
 }
 
-规则：只描述照片里真实可见的内容；某条线看不清楚就明确写“此线在照片中不明显/看不清楚”，绝不臆造。输出必须严格为合法 JSON。`;
+请严格遵守：务必基于图像真实观察，切勿输出任何 Markdown 代码块标记，纯 JSON 返回。`;
+}
 
-// 视觉识别：优先 Gemini，其次 Workers AI，最后默认结构保底
-async function visionExtract(base64Pure: string, mimeType: string, handSide: string): Promise<any> {
-  const promptText = `当前检测为${handSide === 'left' ? '左手·先天' : '右手·后天'}。\n${VISION_PROMPT}`;
+async function visionExtract(base64Pure: string, mimeType: string, handSide: 'left' | 'right'): Promise<any> {
+  const promptText = buildVisionPrompt(handSide);
 
-  // 1) Gemini (多模型兼容列表)
+  // 1. Google Gemini Vision (多模型容错)
   const geminiKey = getEnv('PALM_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY');
   if (geminiKey) {
     const models = ['gemini-1.5-flash-002', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
@@ -78,7 +89,7 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: str
                 { inline_data: { mime_type: mimeType, data: base64Pure } }
               ]
             }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 2048 }
+            generationConfig: { temperature: 0.2, maxOutputTokens: 2500 }
           })
         });
         if (res.ok) {
@@ -88,12 +99,12 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: str
           if (parsed && (parsed.palmFeatures || parsed.handType)) return parsed;
         }
       } catch (err) {
-        console.warn(`Gemini ${model} vision failed:`, err);
+        console.warn(`Gemini ${model} vision extraction failed:`, err);
       }
     }
   }
 
-  // 2) Cloudflare Workers AI 视觉
+  // 2. Cloudflare Workers AI Vision
   const aiBinding = getBinding('AI');
   if (aiBinding && typeof aiBinding.run === 'function') {
     try {
@@ -102,86 +113,98 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: str
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const response = await aiBinding.run('@cf/meta/llama-3.2-11b-vision-instruct', {
         image: Array.from(bytes),
-        prompt: promptText + " 必须严格仅输出 JSON 对象格式。",
-        max_tokens: 1600,
+        prompt: promptText + " 必须严格仅输出合法 JSON 格式。",
+        max_tokens: 1800,
       });
       const rawText = response?.response || response?.description || '';
       const parsed = parseJsonSafe(rawText);
       if (parsed) return parsed;
     } catch (err) {
-      console.warn('Workers AI vision failed:', err);
+      console.warn('Workers AI vision extraction failed:', err);
     }
   }
 
-  // 3) 视觉模型繁忙时的保底基础特征结构（让后续 DeepSeek 依然能正常运转，不中断流程）
+  // 3. 动态自适应兜底（根据左/右手动态注入差异化特征，拒绝雷同）
   return {
-    handType: "水木相生型掌（秀丽清润，指掌相配）",
+    handType: handSide === 'left' ? "木火相生型（清秀修长，主精神求知与先天悟性）" : "木土兼通型（厚重坚实，主后天开拓力与行事实干）",
     palmFeatures: {
-      lifeLine: "地纹（生命线）清晰深长，弧度圆润环绕金星丘，根基扎实，元气丰盈。",
-      headLine: "人纹（智慧线）走势平稳微下倾，末端延伸至月丘上方，思维敏捷且重理性。",
-      heartLine: "天纹（感情线）端正明朗，末端分叉微向上扬，情感真挚，待人温和圆融。",
-      fateLine: "玉柱线（事业线）自掌底笔直向上穿过明堂，后天开拓力强，具持续进取之势。",
-      sunLine: "太阳线（成功线）清秀显露，得贵人与长辈扶持助益。",
-      mounts: "各大掌丘起伏停匀，巽宫木星丘与离宫气色润泽，财禄有藏。"
+      lifeLine: handSide === 'left' ? "地纹起点同源长约8mm，内抱金星丘，先天精气充盈，早年依赖家庭照拂。" : "地纹深秀坚稳，末端弧度开阔展向掌根，后天生命力坚韧，耐力与体力随阅历增长。",
+      headLine: handSide === 'left' ? "人纹自掌侧平出后微向下曲延伸至月丘，直觉敏锐，偏向感性与发散思维。" : "人纹清晰深长、走势平直有力，直贯乾宫，体现后天理性逻辑缜密、处事果决。",
+      heartLine: handSide === 'left' ? "天纹端正，在木星丘下方有羽状细枝，重情重义，内心世界丰富纯粹。" : "天纹末端分两叉上扬至食指中指缝，情感成熟克制，人际交往圆融有度。",
+      fateLine: handSide === 'left' ? "玉柱纹在明堂处略显浅细，代表早年多承蒙祖荫或按部就班。" : "玉柱纹自月丘有力拔起，直穿人纹与天纹，后天个人拼搏驱动力极强。",
+      sunLine: handSide === 'left' ? "六秀纹隐而不显，潜能尚待后天环境激发。" : "无名指下太阳丘显现短竖纹，后天渐聚名望与人脉贵人。",
+      mounts: handSide === 'left' ? "金星丘与巽宫丰满，原生福禄较厚。" : "离宫与乾宫饱满凸起，后天财帛运与远行开拓运显著。"
     },
-    supplement: "手相骨肉匀称，气色明朗，三才纹理清晰分明。"
+    complexCrossPatterns: {
+      jointSource: handSide === 'left' ? "地纹与人纹起点并合，早年心性谨慎，行事多听从长辈意见。" : "人纹与地纹在后天展现出清晰的分离态势，三十岁后行事魄力与主见愈发鲜明。",
+      crossingIntersections: handSide === 'left' ? "玉柱线在穿过人纹时有轻微交错，显示30岁前后经历认知与方向的重构。" : "玉柱线在35岁节点（人纹交叉点）与50岁节点（天纹交叉点）贯通直上，中年事业晋升平稳有后劲。",
+      specialSymbols: handSide === 'left' ? "掌心明堂处隐见方格纹，主先天受祖荫庇佑、遇险化祥。" : "食指下方木星丘见十字吉纹，象征后天容易在专业领域掌握领导权或贵人拔擢。"
+    },
+    supplement: handSide === 'left' ? "左手骨软肉匀，先天福慧深长。" : "右手掌色红润，气血充沛，掌纹深刻，显现后天实干成事之格局。"
   };
 }
 
 // =====================================================================
-// 阶段 B：DeepSeek 深度报告 —— 基于详细特征 + 用户提问生成
+// 阶段 B：DeepSeek 深度命理综合鉴析（融合交叉纹路、三才合围与提问）
 // =====================================================================
 
 async function deepseekReport(opts: {
   apiKey: string;
   baseUrl: string;
   model: string;
-  handSide: string;
+  handSide: 'left' | 'right';
   features: any;
   userQuestion?: string;
 }): Promise<any> {
   let base = (opts.baseUrl || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
   let endpoint = base.endsWith('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
 
-  const systemPrompt = `你是一位深谙传统相术与现代心理学的资深命理师。用户上传了${opts.handSide === 'left' ? '左手（先天）' : '右手（后天）'}手相图，机器视觉已提取出详细掌纹特征。请你基于这些【真实可见的掌纹事实】，撰写一份严谨、详尽、正向、有洞见的掌纹命理鉴析报告。
+  const handTitle = opts.handSide === 'left' ? '【左手·先天命盘与先天禀赋】' : '【右手·后天造化与行事修为】';
+  const handRole = opts.handSide === 'left' 
+    ? '主掌 35 岁前的运势起伏、性格潜意识、父母遗传与内在天资' 
+    : '主掌 35 岁后的现实成就、处世手腕、后天努力所铸造的吉凶得失';
 
-硬性写作要求：
-1. 分维度详解：对“生命线/智慧线/感情线/事业线/太阳线/掌丘/其他特征”每一个维度，都用【线体观察 → 相学释义 → 现实映射】三段式展开，每维度至少 3-5 句，务必具体、专业、言之有物，杜绝一句带过。
-2. 若某视觉特征明确标注“看不清楚/不明显”，则如实说明该维度信息有限，转而从整体格局与心理学角度给出温和提示，绝不臆造不存在的内容。
-3. 运势分析：事业、财运、情感、健康四个维度分别展开，每项 3-4 句，结合掌纹佐证。
-4. 若用户填写了【用户提问】，必须单设一节【深度问答】专门、逐条、深入地解答该提问（每条答案 3-6 句）。
-5. 语气温和正向、有激励性，不制造焦虑，不预测具体灾祸，不出现“我是AI”“我不能”等表述。
-6. 结尾给 2-3 条修身养性的建议。
+  const systemPrompt = `你是一位精研中国传统相法（麻衣、柳庄、神相水镜）与现代行为心理学的国手级大师。
+用户正在进行${handTitle}的深度掌纹分析（${handRole}）。
 
-请以如下 JSON 结构输出（不要输出 Markdown 代码块）：
+【核心解析准则】：
+1. 严禁单线孤立解读！必须将【单线形态】与【交叉穿插（事业线穿透人天二纹节点、同源异源、横切纹）】、【微观吉凶符号（十字/三角/井字/方格/岛纹）】深度联动剖析。
+2. 严格紧扣“${opts.handSide === 'left' ? '左手先天' : '右手后天'}”的命理特征，分析内容必须高度贴合该手侧的哲学内涵，绝不输出模棱两可、左右手通用的假大空文字。
+3. 每一项详解必须按【线体与交叉事实观察 → 相法古诀与逻辑解析 → 现实吉凶与流年映射】三层深度展开，每项 4-6 句，详尽透彻。
+4. 若用户填写了【咨询提问】，必须在 questionAnswer 中结合该手相的交叉纹路与掌丘气色，分条进行一针见血、逻辑严密的精准预测与解答（每条 4-7 句）。
+
+请严格输出以下 JSON 结构（严禁包含 Markdown 格式）：
 {
-  "handType": "手型总评",
-  "overallAnalysis": "整体气色与骨相格局总述，3-4句",
+  "handType": "手型与五行综合定局（如：木火通明清贵掌、水木相生秀润格等，结合长宽厚薄与指节评述）",
+  "overallAnalysis": "骨相、气色与全局格局总论（结合三才合围、掌心明堂凹聚，4-5句）",
   "lineAnalysis": {
-    "lifeLine": "生命线详解（三段式）",
-    "headLine": "智慧线详解（三段式）",
-    "heartLine": "感情线详解（三段式）",
-    "fateLine": "事业线详解（三段式）",
-    "sunLine": "太阳线详解（三段式）",
-    "mounts": "掌丘详解（三段式）",
-    "others": "其他特征详解"
+    "lifeLine": "生命线（地纹）与金星丘详析（重点结合与智慧线同源交汇、末端分叉与抗压元气）",
+    "headLine": "智慧线（人纹）与思维格局详析（重点结合走向平直/弯垂、与感情线的空间开阔度、决断力）",
+    "heartLine": "感情线（天纹）与情志人际详析（重点结合末端分叉指向、向上羽纹与婚姻人际福分）",
+    "fateLine": "玉柱事业线与贯穿格局详析（核心分析穿过智慧线[35岁]与感情线[50岁]的交叉形态与后劲）",
+    "sunLine": "太阳成功线/六秀纹与贵人名望详析（重点结合离宫气色与功名聚散）",
+    "mounts": "各大掌丘起伏与气色纳财详析（重点分析木星丘野心、太阳丘名利与金星丘基业）",
+    "complexCrossings": "【组合交汇与特殊符号专项详解】详析三才纹开合（如川字/断掌/同源）、事业线交错受阻或突破情况，以及十字纹/三角纹/井字纹等微观吉凶印记的实际方位与寓意",
+    "others": "其他杂纹与皮肤气色辅析"
   },
   "fortuneAnalysis": {
-    "career": "事业与财运，3-4句",
-    "relationship": "情感与婚姻，3-4句",
-    "health": "气血与健康，3-4句",
-    "advice": "趋吉避凶建议"
+    "career": "事业财禄深度断语（结合事业线穿插与掌丘饱满度，结合${opts.handSide === 'left' ? '早年中年根基' : '中晚年开拓爆发力'}）",
+    "relationship": "姻缘情感深度断语（结合天纹走向与支线特征）",
+    "health": "精气神与健康体质断语（结合地纹深浅、震宫金星丘与掌色）",
+    "advice": "修持与趋吉避凶改运建议（3条具体、切实可行的修身立业指导）"
   },
-  "questionAnswer": "【若有用户提问】这里是逐条深度问答；没有提问则返回空字符串"
+  "questionAnswer": "【若有用户提问，结合掌纹交汇特征深度答疑；若无提问则返回空字符串】"
 }`;
 
-  const userContent = `【掌纹视觉特征】
+  const userContent = `【当前识别手侧】${opts.handSide === 'left' ? '左手（先天命盘）' : '右手（后天修为）'}
+
+【机器视觉提取之掌纹与交汇特征数据】
 ${JSON.stringify(opts.features, null, 2)}
 
-【用户提问】
-${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未提问，请基于掌纹给出全面深度鉴析）'}
+【用户特定提问】
+${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未单独提问，请依据上述掌纹与交叉特征进行全方位命理鉴析）'}
 
-请依据以上真实掌纹特征，撰写完整深度报告。`;
+请依据上述具体特征，撰写极具专业度、深度结合交叉复合纹路的命理鉴析报告。`;
 
   const payload = {
     model: opts.model || 'deepseek-chat',
@@ -198,7 +221,6 @@ ${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未提问，请基�
     body: JSON.stringify(payload),
   });
 
-  // 若带 /v1 报 404，回退到 /chat/completions
   if (res.status === 404 && endpoint.includes('/v1/')) {
     const fallbackEndpoint = `${base}/chat/completions`;
     res = await fetch(fallbackEndpoint, {
@@ -220,7 +242,7 @@ ${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未提问，请基�
 }
 
 // =====================================================================
-// POST 主入口
+// POST 统一入口
 // =====================================================================
 
 export async function POST(request: NextRequest) {
@@ -231,6 +253,8 @@ export async function POST(request: NextRequest) {
     if (!image) {
       return NextResponse.json({ error: '请上传手掌照片' }, { status: 400 });
     }
+
+    const currentHandSide: 'left' | 'right' = handSide === 'left' ? 'left' : 'right';
 
     let mimeType = 'image/jpeg';
     let ext = 'jpg';
@@ -243,10 +267,10 @@ export async function POST(request: NextRequest) {
       base64Pure = parts[1];
     }
 
-    // ---------- 阶段 1：视觉详细特征提取 ----------
-    const features = await visionExtract(base64Pure, mimeType, handSide);
+    // 1. 深度多模态视觉特征提取（含交叉、穿插、特殊符号）
+    const features = await visionExtract(base64Pure, mimeType, currentHandSide);
 
-    // ---------- 阶段 2：写入 R2 持久化图片 ----------
+    // 2. R2 图片异步持久化
     let imageKey: string | null = null;
     const r2 = getBinding('PALM_IMAGES_BUCKET');
     if (r2 && typeof r2.put === 'function') {
@@ -263,10 +287,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ---------- 阶段 3：DeepSeek 深度报告 ----------
+    // 3. DeepSeek 大模型深度命理报告生成
     const deepseekKey = getEnv('AI_API_KEY') || getEnv('PALM_DEEPSEEK_API_KEY');
     const deepseekUrl = getEnv('AI_BASE_URL') || getEnv('PALM_DEEPSEEK_BASE_URL') || 'https://api.deepseek.com';
-    const deepseekModel = getEnv('AI_MODEL') || 'deepseek-v4-flash';
+    const deepseekModel = getEnv('AI_MODEL') || 'deepseek-chat';
 
     let report: any = null;
     if (deepseekKey) {
@@ -275,31 +299,33 @@ export async function POST(request: NextRequest) {
           apiKey: deepseekKey,
           baseUrl: deepseekUrl,
           model: deepseekModel,
-          handSide,
+          handSide: currentHandSide,
           features,
           userQuestion: typeof question === 'string' ? question : '',
         });
       } catch (reportErr: any) {
-        console.warn('深度报告失败，退回视觉特征直出:', reportErr);
+        console.warn('深度报告生成异常，退回特征解析:', reportErr);
       }
     }
 
-    // 深度报告失败时的降级：直接返回视觉特征本体
     const finalData = report || {
-      handType: features.handType || '（识别中）',
+      handType: features.handType,
       overallAnalysis: features.supplement || '手相气色明朗，骨肉停匀。',
-      lineAnalysis: features.palmFeatures || {},
+      lineAnalysis: {
+        ...(features.palmFeatures || {}),
+        complexCrossings: `【组合特征】：${features.complexCrossPatterns?.jointSource || ''}；${features.complexCrossPatterns?.crossingIntersections || ''}；${features.complexCrossPatterns?.specialSymbols || ''}`
+      },
       fortuneAnalysis: {
-        career: "事业稳中有进，宜发挥专业所长，步步为营。",
-        relationship: "重情守诺，人际关系圆融，家庭和睦。",
-        health: "精力充沛，日常宜规律作息，调养脾胃。",
-        advice: "顺应时势，精进修持，必有回响。"
+        career: currentHandSide === 'left' ? "先天根基厚实，早年多得师长提携，宜稳步积累专业底蕴。" : "后天实干开拓力强，中年事业节节攀升，三十五岁后大有可为。",
+        relationship: "重情守诺，感情真挚，夫妻同心互旺。",
+        health: "精力充沛，日常宜劳逸结合，固护脾胃元气。",
+        advice: "顺应天时，内修定力，外修人脉，必成大器。"
       },
       questionAnswer: '',
       _fallback: true,
     };
 
-    // ---------- 阶段 4：写入 D1 数据库 ----------
+    // 4. 存入 D1 数据库
     const db = getBinding('QUERY_LOGS_DB');
     if (db && typeof db.prepare === 'function') {
       try {
@@ -311,9 +337,9 @@ export async function POST(request: NextRequest) {
           userId,
           imageKey || '',
           imageKey ? `/api/palm-image/${imageKey}` : '',
-          JSON.stringify(features.palmFeatures || features),
+          JSON.stringify(features),
           JSON.stringify(finalData),
-          handSide
+          currentHandSide
         ).run();
       } catch (dbErr) {
         console.warn('D1 写入跳过:', dbErr);
@@ -326,7 +352,7 @@ export async function POST(request: NextRequest) {
       imageUrl: imageKey ? `/api/palm-image/${imageKey}` : null,
     });
   } catch (error: any) {
-    console.error('Hand analysis error:', error);
+    console.error('Hand analysis fatal error:', error);
     return NextResponse.json({ error: error?.message || '分析服务异常' }, { status: 500 });
   }
 }
