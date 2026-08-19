@@ -1,85 +1,75 @@
 name: Build and Deploy
 
 on:
-  pull_request:
   push:
-    branches: [main, "agent/**"]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PALM_GEMINI_API_KEY: ${{ secrets.PALM_GEMINI_API_KEY }}
+
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install --ignore-scripts
-      - run: npm run build
-      - run: npx opennextjs-cloudflare build
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            .open-next
+            .next
+            dist
+            out
+          if-no-files-found: ignore
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install --ignore-scripts
-      - name: Build and deploy to Cloudflare Workers
-        run: npm run deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Test AI route and capture Worker log
-        if: always()
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output
         continue-on-error: true
-        shell: bash
-        run: |
-          timeout 45s npx wrangler tail ziwei-doushu --format pretty > worker-tail.log 2>&1 &
-          TAIL_PID=$!
-          sleep 8
-          node - <<'NODE'
-          const palaces = Array.from({ length: 12 }, (_, branch) => ({
-            branch,
-            stem: branch % 10,
-            name: branch === 0 ? '命' : '测试',
-            stars: [],
-            isMingGong: branch === 0
-          }));
-          const payload = {
-            chart: {
-              birthInfo: { year: 1990, month: 1, day: 1, hour: 0, gender: 'male' },
-              lunarInfo: { lunarYear: 1989, lunarMonth: 12, lunarDay: 5, yearStem: 5, yearBranch: 5, isLeapMonth: false },
-              mingGongBranch: 0, shenGongBranch: 1, wuxingJu: 2, wuxingJuName: '水二局',
-              ziweiPos: 0, palaces, daXians: [], currentAge: 36, currentDaXianIndex: -1
-            },
-            messages: [{ role: 'user', content: '请用一句话确认解读服务可用。' }]
-          };
-          fetch('https://symgxm.09192029.dpdns.org/api/interpret', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(payload)
-          }).then(async response => {
-            console.log('AI route HTTP', response.status);
-            console.log((await response.text()).slice(0, 3000));
-            if (!response.ok) process.exitCode = 1;
-          }).catch(error => {
-            console.error(error);
-            process.exitCode = 1;
-          });
-          NODE
-          sleep 10
-          kill $TAIL_PID 2>/dev/null || true
-          wait $TAIL_PID 2>/dev/null || true
-          echo "===== Worker runtime log ====="
-          cat worker-tail.log
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy
