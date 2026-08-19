@@ -1,7 +1,20 @@
-import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
+
+// 获取 Cloudflare D1 绑定实例
+function getDb(): any {
+  // 1. 优先从 OpenNext 全局 process.env 获取绑定
+  const env = (process as any).env;
+  if (env?.QUERY_LOGS_DB) {
+    return env.QUERY_LOGS_DB;
+  }
+  // 2. 兼容全局 bindings 注入
+  if (typeof (globalThis as any).QUERY_LOGS_DB !== 'undefined') {
+    return (globalThis as any).QUERY_LOGS_DB;
+  }
+  return null;
+}
 
 // 获取指定用户的历史手相分析记录
 export async function GET(
@@ -18,8 +31,7 @@ export async function GET(
       );
     }
 
-    const { env } = getRequestContext();
-    const db = env.QUERY_LOGS_DB;
+    const db = getDb();
 
     if (!db) {
       return NextResponse.json(
@@ -76,8 +88,7 @@ export async function DELETE(
       );
     }
 
-    const { env } = getRequestContext();
-    const db = env.QUERY_LOGS_DB;
+    const db = getDb();
 
     if (!db) {
       return NextResponse.json(
