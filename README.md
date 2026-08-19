@@ -82,9 +82,7 @@ https://你的域名/admin/query-logs
 ```text
 ziwei-doushu-logs
 ```
-
 数据库 ID 已通过 `wrangler.jsonc` 的 `QUERY_LOGS_DB` 绑定配置。数据库 ID 不是密钥，可以安全提交。部署脚本会在每次生产部署前自动执行 `migrations/0001_ai_query_logs.sql`。
-
 ### 2. 配置管理员邮箱
 
 在 Worker 的变量和密钥中添加文本变量：
@@ -92,9 +90,7 @@ ziwei-doushu-logs
 ```text
 ADMIN_EMAILS=你的邮箱
 ```
-
 多个管理员邮箱使用英文逗号分隔。
-
 ### 3. 使用Cloudflare Access保护后台
 
 在 **Zero Trust → Access controls → Applications** 创建 Self-hosted 应用，只允许管理员邮箱，并保护两个路径：
@@ -103,12 +99,9 @@ ADMIN_EMAILS=你的邮箱
 你的域名/admin/*
 你的域名/api/admin/*
 ```
-
 应用代码要求同时存在 Cloudflare Access JWT 和经过验证的管理员邮箱；未配置 Access 时后台默认拒绝访问。
-
 ## 询问记录隐私边界
-
 - 保存用户问题、AI回答、命盘摘要、状态、耗时、国家或地区代码及随机会话编号。
 - 不保存真实IP、API Key、Cookie或完整请求头。
 - 前端明确提示保存范围并链接到隐私政策。
-- 默认保留30天，管理员可提前删除。
+- 默认保留30天，管理员可提前删除
