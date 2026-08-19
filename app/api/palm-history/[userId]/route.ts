@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
-
 // 获取 Cloudflare D1 绑定实例
 function getDb(): any {
   // 1. 优先从 OpenNext 全局 process.env 获取绑定
