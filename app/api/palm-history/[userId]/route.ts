@@ -1,36 +1,114 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { getRequestContext } from '@cloudflare/next-on-pages';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
-/**
- * 查询某用户最近的手相测算历史，从 D1 读取，按时间倒序。
- * 路径：/api/palm-history/{userId}
- */
-export async function GET(request: Request, ctx: { params: Promise<{ userId: string }> | { userId: string } }): Promise<Response> {
-  const params = await ctx.params;
-  const userId = params.userId;
+// 获取指定用户的历史手相分析记录
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const { userId } = await params;
 
-  if (!/^[a-zA-Z0-9_-]{1,80}$/.test(userId)) {
-    return Response.json({ error: '无效的用户标识' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const { env } = getRequestContext();
+    const db = env.QUERY_LOGS_DB;
+
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database binding QUERY_LOGS_DB not found' },
+        { status: 500 }
+      );
+    }
+
+    const query = `
+      SELECT 
+        id,
+        user_id,
+        image_key,
+        image_url,
+        extracted_features,
+        report_content,
+        hand_side,
+        created_at
+      FROM palm_records
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+
+    const { results } = await db.prepare(query).bind(userId).all();
+
+    return NextResponse.json({
+      success: true,
+      data: results || []
+    });
+  } catch (error: any) {
+    console.error('Failed to fetch palm history:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Internal Server Error' },
+      { status: 500 }
+    );
   }
+}
 
-  const { env } = getCloudflareContext();
-  const { results } = await env.QUERY_LOGS_DB.prepare(
-    `SELECT id, image_url, extracted_features, report_content, created_at
-     FROM palm_records
-     WHERE user_id = ?
-     ORDER BY created_at DESC
-     LIMIT 20`,
-  )
-    .bind(userId)
-    .all<{
-      id: string;
-      image_url: string;
-      extracted_features: string;
-      report_content: string;
-      created_at: string;
-    }>();
+// 删除指定用户的单条或全部手相分析记录
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  try {
+    const { userId } = await params;
+    const { searchParams } = new URL(request.url);
+    const recordId = searchParams.get('id');
 
-  return Response.json({ success: true, history: results }, { headers: { 'Cache-Control': 'no-store' } });
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const { env } = getRequestContext();
+    const db = env.QUERY_LOGS_DB;
+
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database binding QUERY_LOGS_DB not found' },
+        { status: 500 }
+      );
+    }
+
+    if (recordId) {
+      // 删除单条
+      await db
+        .prepare('DELETE FROM palm_records WHERE user_id = ? AND id = ?')
+        .bind(userId, recordId)
+        .run();
+    } else {
+      // 清空该用户所有记录
+      await db
+        .prepare('DELETE FROM palm_records WHERE user_id = ?')
+        .bind(userId)
+        .run();
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Record(s) deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Failed to delete palm record:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
 }
