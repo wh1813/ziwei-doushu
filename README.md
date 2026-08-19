@@ -1,4 +1,4 @@
-# 紫微斗数 · Cloudflare 智能排盘
+# 紫微斗数&手相 · Cloudflare 智能排盘
 
 基于倪海夏《天纪》教学体系的紫微斗数排盘系统，包含排盘算法、四化系统、格局知识库、古籍原文与流式 AI 命盘解读。
 
@@ -58,11 +58,6 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.example
 如果使用 Releases 中的 51.8 万条样本数据，请保留上游要求的 attribution：
 
 > 本项目使用了紫微斗数开源样本数据集 v3.0（518,400 条）  
-> 来源：https://github.com/Renhuai123/ziwei-doushu  
-> 作者：王多鱼AI
-
-代码使用 MIT License；古籍原文属于公有领域。详见 [LICENSE](./LICENSE)。
-<!-- Cloudflare Workers build trigger -->
 
 
 ## AI询问记录后台
