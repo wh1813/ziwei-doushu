@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// 优先采用免费层最新主力模型，遇到高负载自动降级
+// 官方标准免费模型名称（顺序：1.5-flash 主力 -> 2.0-flash -> 1.5-flash-8b 避让）
 const GEMINI_MODELS = [
-  'gemini-2.5-flash',
+  'gemini-1.5-flash',
   'gemini-2.0-flash',
-  'gemini-1.5-flash-latest'
+  'gemini-1.5-flash-8b'
 ];
 
-// 获取环境变量与资源绑定
 function getEnv(key: string): string | undefined {
   const env = (process as any).env || {};
   const globalEnv = (globalThis as any) || {};
   return env[key] || globalEnv[key] || process.env[key];
 }
 
-// 避让重试请求
 async function fetchGeminiWithRetry(url: string, body: any, maxRetries = 2): Promise<Response> {
   let lastResponse: Response | null = null;
   for (let i = 0; i <= maxRetries; i++) {
@@ -24,21 +22,18 @@ async function fetchGeminiWithRetry(url: string, body: any, maxRetries = 2): Pro
       body: JSON.stringify(body),
     });
 
-    // 若非 503 / 429 错误，直接返回
     if (res.status !== 503 && res.status !== 429) {
       return res;
     }
 
     lastResponse = res;
-    // 遇到限流或高负载，避让 1.2s ~ 2.4s 后重试
     if (i < maxRetries) {
-      await new Promise((resolve) => setTimeout(resolve, 1200 * (i + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (i + 1)));
     }
   }
   return lastResponse!;
 }
 
-// 调用 Gemini 进行手相视觉识别
 async function analyzeImageWithGemini(apiKey: string, base64Data: string, mimeType: string, promptText: string) {
   let lastError = '';
 
@@ -81,7 +76,7 @@ async function analyzeImageWithGemini(apiKey: string, base64Data: string, mimeTy
     }
   }
 
-  throw new Error(`所有 Gemini 免费模型调用均繁忙，最后错误: ${lastError}`);
+  throw new Error(`所有 Gemini 模型调用均失败，最后错误: ${lastError}`);
 }
 
 export async function POST(request: NextRequest) {
@@ -105,7 +100,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 提取 Base64 编码与 MIME 类型
     let mimeType = 'image/jpeg';
     let base64Data = image;
 
@@ -137,10 +131,8 @@ export async function POST(request: NextRequest) {
   }
 }`;
 
-    // 执行视觉识别
     const analysisResult = await analyzeImageWithGemini(apiKey, base64Data, mimeType, prompt);
 
-    // 尝试持久化到 Cloudflare D1 数据库（若绑定存在）
     const db = (process as any).env?.QUERY_LOGS_DB || (globalThis as any).QUERY_LOGS_DB;
     if (db) {
       try {
