@@ -30,5 +30,20 @@
       "database_id": "c76dec00-cf92-404f-acfb-891a04212bb6",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PALM_IMAGES_BUCKET",
+      "bucket_name": "palm-images"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "HAND_KNOWLEDGE_INDEX",
+      "index_name": "palmistry-knowledge-base"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  }
 }
