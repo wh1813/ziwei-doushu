@@ -1,11 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// 兼容读取 OpenNext / Cloudflare 环境变量与机密
 function getEnv(key: string): string | undefined {
+  try {
+    const { getCloudflareContext } = require('@opennextjs/cloudflare');
+    const ctx = getCloudflareContext();
+    if (ctx?.env?.[key]) return ctx.env[key];
+  } catch {}
+
   const env = (process as any).env || {};
   const globalEnv = (globalThis as any) || {};
   return env[key] || globalEnv[key] || process.env[key] || globalEnv.env?.[key];
 }
 
+// 安全获取 Cloudflare Bindings (D1, R2, AI)
+function getCloudflareBinding(name: string): any {
+  // 1. 优先从 @opennextjs/cloudflare 上下文中获取
+  try {
+    const { getCloudflareContext } = require('@opennextjs/cloudflare');
+    const ctx = getCloudflareContext();
+    if (ctx?.env?.[name]) return ctx.env[name];
+  } catch {}
+
+  // 2. 降级从全局上下文或 process.env 获取
+  const globalObj = globalThis as any;
+  const env = (process as any).env || {};
+  return globalObj[name] || env[name] || globalObj.env?.[name];
+}
+
+// 稳健的 JSON 解析器
 function parseJsonSafe(text: string): any {
   if (!text) return null;
   try {
@@ -28,14 +51,19 @@ function parseJsonSafe(text: string): any {
   }
 }
 
-function getBinding(name: string): any {
-  const env = (process as any).env || {};
-  const globalObj = globalThis as any;
-  return env[name] || globalObj[name] || globalObj.env?.[name];
+// Base64 转 Uint8Array (供 R2 存储与 Workers AI 读取)
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 // =====================================================================
-// 阶段 A：多模态视觉特征深度提取（主攻交汇、穿透、复合纹路与左右手差异）
+// 阶段 A：多模态视觉特征提取（重点捕捉复合穿插、交叉纹路与左右手侧重点）
 // =====================================================================
 
 function buildVisionPrompt(handSide: 'left' | 'right') {
@@ -47,7 +75,6 @@ function buildVisionPrompt(handSide: 'left' | 'right') {
 当前正在鉴析用户的${handContext}。
 
 请你以极度专业、细致入微的眼光观察手掌图像，重点捕捉【多线交汇、穿透断续、交叉复合纹路】，按以下格式输出 JSON：
-
 {
   "handType": "手型（金/木/水/火/土型掌，指掌比例，指节坚实度，厚薄软硬）",
   "palmFeatures": {
@@ -72,7 +99,7 @@ function buildVisionPrompt(handSide: 'left' | 'right') {
 async function visionExtract(base64Pure: string, mimeType: string, handSide: 'left' | 'right'): Promise<any> {
   const promptText = buildVisionPrompt(handSide);
 
-  // 1. Google Gemini Vision (多模型容错)
+  // 1. Google Gemini 视觉
   const geminiKey = getEnv('PALM_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY');
   if (geminiKey) {
     const models = ['gemini-1.5-flash-002', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
@@ -99,18 +126,16 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
           if (parsed && (parsed.palmFeatures || parsed.handType)) return parsed;
         }
       } catch (err) {
-        console.warn(`Gemini ${model} vision extraction failed:`, err);
+        console.warn(`Gemini ${model} vision failed:`, err);
       }
     }
   }
 
-  // 2. Cloudflare Workers AI Vision
-  const aiBinding = getBinding('AI');
+  // 2. Cloudflare 原生 Workers AI
+  const aiBinding = getCloudflareBinding('AI');
   if (aiBinding && typeof aiBinding.run === 'function') {
     try {
-      const binary = atob(base64Pure);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const bytes = base64ToUint8Array(base64Pure);
       const response = await aiBinding.run('@cf/meta/llama-3.2-11b-vision-instruct', {
         image: Array.from(bytes),
         prompt: promptText + " 必须严格仅输出合法 JSON 格式。",
@@ -120,11 +145,11 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
       const parsed = parseJsonSafe(rawText);
       if (parsed) return parsed;
     } catch (err) {
-      console.warn('Workers AI vision extraction failed:', err);
+      console.warn('Workers AI vision failed:', err);
     }
   }
 
-  // 3. 动态自适应兜底（根据左/右手动态注入差异化特征，拒绝雷同）
+  // 3. 动态自适应兜底
   return {
     handType: handSide === 'left' ? "木火相生型（清秀修长，主精神求知与先天悟性）" : "木土兼通型（厚重坚实，主后天开拓力与行事实干）",
     palmFeatures: {
@@ -145,7 +170,7 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
 }
 
 // =====================================================================
-// 阶段 B：DeepSeek 深度命理综合鉴析（融合交叉纹路、三才合围与提问）
+// 阶段 B：DeepSeek 深度命理综合鉴析
 // =====================================================================
 
 async function deepseekReport(opts: {
@@ -247,8 +272,8 @@ ${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未单独提问，�
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { image, handSide = 'right', userId = 'anonymous', question } = body;
+    const body = await request.json().catch(() => ({}));
+    const { image, handSide = 'right', userId = 'web-user', question } = body;
 
     if (!image) {
       return NextResponse.json({ error: '请上传手掌照片' }, { status: 400 });
@@ -267,30 +292,36 @@ export async function POST(request: NextRequest) {
       base64Pure = parts[1];
     }
 
-    // 1. 深度多模态视觉特征提取（含交叉、穿插、特殊符号）
+    // 1. 深度多模态视觉特征提取
     const features = await visionExtract(base64Pure, mimeType, currentHandSide);
 
-    // 2. R2 图片异步持久化
+    // 2. 写入 R2 存储桶 (标准 ArrayBuffer 写入)
     let imageKey: string | null = null;
-    const r2 = getBinding('PALM_IMAGES_BUCKET');
+    const r2 = getCloudflareBinding('PALM_IMAGES_BUCKET');
     if (r2 && typeof r2.put === 'function') {
       try {
         const recordId = crypto.randomUUID();
         imageKey = `palms/${userId}/${recordId}.${ext}`;
-        const binary = atob(base64Pure);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        await r2.put(imageKey, bytes, { httpMetadata: { contentType: mimeType } });
+        const imageBytes = base64ToUint8Array(base64Pure);
+
+        await r2.put(imageKey, imageBytes.buffer, {
+          httpMetadata: {
+            contentType: mimeType,
+          },
+        });
+        console.log(`[R2 Success] 图片成功持久化到 R2: ${imageKey}`);
       } catch (r2Err) {
-        console.warn('R2 写入跳过:', r2Err);
+        console.error('[R2 Error] R2 写入异常:', r2Err);
         imageKey = null;
       }
+    } else {
+      console.warn('[R2 Warning] 未找到有效的 PALM_IMAGES_BUCKET 实例');
     }
 
     // 3. DeepSeek 大模型深度命理报告生成
     const deepseekKey = getEnv('AI_API_KEY') || getEnv('PALM_DEEPSEEK_API_KEY');
     const deepseekUrl = getEnv('AI_BASE_URL') || getEnv('PALM_DEEPSEEK_BASE_URL') || 'https://api.deepseek.com';
-    const deepseekModel = getEnv('AI_MODEL') || 'deepseek-chat';
+    const deepseekModel = getEnv('AI_MODEL') || 'deepseek-v4-flash';
 
     let report: any = null;
     if (deepseekKey) {
@@ -325,8 +356,8 @@ export async function POST(request: NextRequest) {
       _fallback: true,
     };
 
-    // 4. 存入 D1 数据库
-    const db = getBinding('QUERY_LOGS_DB');
+    // 4. 写入 D1 数据库
+    const db = getCloudflareBinding('QUERY_LOGS_DB');
     if (db && typeof db.prepare === 'function') {
       try {
         await db.prepare(`
@@ -341,6 +372,7 @@ export async function POST(request: NextRequest) {
           JSON.stringify(finalData),
           currentHandSide
         ).run();
+        console.log(`[D1 Success] 手相记录成功存入数据库`);
       } catch (dbErr) {
         console.warn('D1 写入跳过:', dbErr);
       }
