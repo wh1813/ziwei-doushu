@@ -7,6 +7,7 @@ export default function PalmPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [handSide, setHandSide] = useState<"left" | "right">("right");
+  const [question, setQuestion] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -31,7 +32,6 @@ export default function PalmPage() {
         let width = img.width;
         let height = img.height;
 
-        // 限制最大宽度/高度为 1200px，既清晰又极度轻量
         const MAX_SIZE = 1200;
         if (width > height && width > MAX_SIZE) {
           height = Math.round((height * MAX_SIZE) / width);
@@ -73,6 +73,7 @@ export default function PalmPage() {
           image: base64Image,
           handSide: handSide,
           userId: "web-user",
+          question: question.trim(),
         }),
       });
 
@@ -82,13 +83,38 @@ export default function PalmPage() {
         throw new Error(data.error || "分析失败，请稍后重试");
       }
 
-      setResult(data.data);
+      setResult(data);
     } catch (err: any) {
       setErrorMsg(err.message || "请求服务器失败，请检查网络连接");
     } finally {
       setLoading(false);
     }
   };
+
+  // 渲染单条线详解（三段式）
+  const renderLine = (title: string, color: string, content?: string) => {
+    if (!content) return null;
+    return (
+      <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+        <div className={`text-xs font-bold ${color} mb-2`}>{title}</div>
+        <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line">{content}</p>
+      </div>
+    );
+  };
+
+  // 渲染四维运势
+  const renderFortune = (key: string, icon: string, title: string) => {
+    const content = result?.data?.fortuneAnalysis?.[key];
+    if (!content) return null;
+    return (
+      <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
+        <div className="text-xs font-semibold text-slate-400 mb-1">{icon} {title}</div>
+        <div className="text-xs text-slate-200 leading-relaxed">{content}</div>
+      </div>
+    );
+  };
+
+  const report = result?.data;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
@@ -170,6 +196,24 @@ export default function PalmPage() {
             </div>
           </div>
 
+          {/* 提问输入框（新增） */}
+          <div className="mt-5 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              💬 你想深入咨询什么？（可选）
+            </label>
+            <textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="例如：我的事业会在什么时候迎来转机？感情上适合怎样的伴侣？今年财运如何？"
+              rows={3}
+              maxLength={500}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 resize-none"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              AI 将结合你的掌纹特征，对提问做逐条深度解答与预测
+            </p>
+          </div>
+
           {/* 错误提示 */}
           {errorMsg && (
             <div className="mt-4 p-3 bg-red-950/50 border border-red-800 text-red-300 text-sm rounded-xl text-center">
@@ -190,93 +234,75 @@ export default function PalmPage() {
                 : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
             }`}
           >
-            {loading ? "正在深度识别掌纹与气色特征，请稍候..." : "开始相术分析"}
+            {loading ? "正在深度识别掌纹并生成详解报告，请稍候..." : "开始相术分析"}
           </button>
         </div>
 
         {/* 报告展示区域 */}
-        {result && (
+        {result && report && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6 animate-fade-in">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2">
-                <span>📜</span> 手相综合鉴析报告
+                <span>📜</span> 手相深度鉴析报告
               </h2>
-              {result.handType && (
+              {report.handType && (
                 <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold rounded-full">
-                  {result.handType}
+                  {report.handType}
                 </span>
               )}
             </div>
 
             {/* 总体格局 */}
-            {result.overallAnalysis && (
+            {report.overallAnalysis && (
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                 <div className="text-xs text-slate-400 font-semibold mb-1">【气色与骨相格局】</div>
-                <p className="text-sm text-slate-200 leading-relaxed">{result.overallAnalysis}</p>
+                <p className="text-sm text-slate-200 leading-relaxed">{report.overallAnalysis}</p>
               </div>
             )}
 
-            {/* 核心掌纹特征 */}
-            {result.palmFeatures && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {result.palmFeatures.lifeLine && (
-                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs font-bold text-emerald-400 mb-1">生命线 (地纹)</div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.lifeLine}</p>
-                  </div>
-                )}
-                {result.palmFeatures.headLine && (
-                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs font-bold text-blue-400 mb-1">智慧线 (人纹)</div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.headLine}</p>
-                  </div>
-                )}
-                {result.palmFeatures.heartLine && (
-                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs font-bold text-rose-400 mb-1">感情线 (天纹)</div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.heartLine}</p>
-                  </div>
-                )}
-                {result.palmFeatures.fateLine && (
-                  <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-                    <div className="text-xs font-bold text-purple-400 mb-1">事业线 / 运势线</div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{result.palmFeatures.fateLine}</p>
-                  </div>
-                )}
+            {/* 分维度详解（新增：三段式） */}
+            {report.lineAnalysis && (
+              <div className="space-y-2">
+                <div className="text-sm font-bold text-amber-300 mb-1">【掌纹分维度详解】</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {renderLine("生命线（地纹）", "text-emerald-400", report.lineAnalysis.lifeLine)}
+                  {renderLine("智慧线（人纹）", "text-blue-400", report.lineAnalysis.headLine)}
+                  {renderLine("感情线（天纹）", "text-rose-400", report.lineAnalysis.heartLine)}
+                  {renderLine("事业线 / 运势线", "text-purple-400", report.lineAnalysis.fateLine)}
+                  {renderLine("太阳线 / 成功线", "text-amber-400", report.lineAnalysis.sunLine)}
+                  {renderLine("掌丘与气色", "text-cyan-400", report.lineAnalysis.mounts)}
+                  {renderLine("其他特征", "text-slate-300", report.lineAnalysis.others)}
+                </div>
               </div>
             )}
 
-            {/* 四维流年运势分析 */}
-            {result.fortuneAnalysis && (
+            {/* 四维运势精解 */}
+            {report.fortuneAnalysis && (
               <div className="space-y-3">
                 <div className="text-sm font-bold text-amber-300">【四维运势精解】</div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {result.fortuneAnalysis.career && (
-                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
-                      <div className="text-xs font-semibold text-slate-400 mb-1">💼 事业财禄</div>
-                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.career}</div>
-                    </div>
-                  )}
-                  {result.fortuneAnalysis.relationship && (
-                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
-                      <div className="text-xs font-semibold text-slate-400 mb-1">❤️ 婚姻情感</div>
-                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.relationship}</div>
-                    </div>
-                  )}
-                  {result.fortuneAnalysis.health && (
-                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
-                      <div className="text-xs font-semibold text-slate-400 mb-1">🩺 气血健康</div>
-                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.health}</div>
-                    </div>
-                  )}
-                  {result.fortuneAnalysis.advice && (
-                    <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800">
-                      <div className="text-xs font-semibold text-amber-400 mb-1">💡 趋吉避凶建议</div>
-                      <div className="text-xs text-slate-200 leading-relaxed">{result.fortuneAnalysis.advice}</div>
-                    </div>
-                  )}
+                  {renderFortune("career", "💼", "事业财禄")}
+                  {renderFortune("relationship", "❤️", "婚姻情感")}
+                  {renderFortune("health", "🩺", "气血健康")}
+                  {renderFortune("advice", "💡", "趋吉避凶建议")}
                 </div>
               </div>
+            )}
+
+            {/* 深度问答（新增） */}
+            {report.questionAnswer && (
+              <div className="bg-slate-950 border border-amber-500/30 rounded-xl p-4">
+                <div className="text-sm font-bold text-amber-300 mb-2">💬 你的专属深度问答</div>
+                <div className="whitespace-pre-line text-sm text-slate-200 leading-relaxed">
+                  {report.questionAnswer}
+                </div>
+              </div>
+            )}
+
+            {report._fallback && (
+              <p className="text-xs text-slate-500 text-center">
+                （本次因深度报告生成失败，以上为视觉初步分析；请稍后重试以获得完整深度鉴析）
+              </p>
             )}
           </div>
         )}
