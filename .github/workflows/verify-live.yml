@@ -68,12 +68,63 @@ jobs:
           print("GOLDEN LIVE CHECK: ALL MATCH")
           PY
 
+      - name: Golden check /api/qimen-chart (birth info 1994-05-21)
+        run: |
+          code=$(curl -s -o /tmp/chart_birth.json -w "%{http_code}" -X POST "$BASE_URL/api/qimen-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"感情","birthDate":"1994-05-21","birthTimeIndex":1}')
+          echo "POST /api/qimen-chart(birth) -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "--- error body ---"; cat /tmp/chart_birth.json; echo; exit 1
+          fi
+          code2=$(curl -s -o /tmp/chart_nobirth.json -w "%{http_code}" -X POST "$BASE_URL/api/qimen-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}')
+          echo "POST /api/qimen-chart(no birth) -> HTTP $code2"
+          if [ "$code2" != "200" ]; then
+            echo "--- error body ---"; cat /tmp/chart_nobirth.json; echo; exit 1
+          fi
+          python3 - <<'PY'
+          import json, sys
+          live = json.load(open("/tmp/chart_birth.json"))
+          p = live.get("personal") or {}
+          bazi = p.get("baZi") or {}
+          selfp = p.get("self") or {}
+          partner = p.get("partner") or {}
+          ys = p.get("yearSymbol") or {}
+          zf = ys.get("zhifuProxy") or {}
+          uf = live.get("chartUnfavorable") or {}
+          checks = [
+              ("personal.notnull",     bool(p),                                       True),
+              ("baZi.dayGanZhi",       bazi.get("dayGanZhi"),                         "丁未"),
+              ("baZi.yearGanZhi",      bazi.get("yearGanZhi"),                        "甲戌"),
+              ("self.symbol",          selfp.get("displaySymbol"),                    "丁"),
+              ("self.role",            selfp.get("role"),                             "本人（八字日干）"),
+              ("partner.symbol",       partner.get("displaySymbol"),                  "壬"),
+              ("yearSymbol.zhifuProxy", bool(zf.get("star")),                         True),
+              ("yearSymbol.proxyStem", ys.get("sourceStem"),                          "戊"),
+              ("chartUnfavorable.arr", isinstance(uf.get("jiXing"), list) and isinstance(uf.get("ruMu"), list), True),
+          ]
+          fails = 0
+          for name, got, want in checks:
+              ok = got == want
+              print(("OK  " if ok else "FAIL") + f" {name}: live={got} expect={want}")
+              fails += 0 if ok else 1
+          if fails:
+              sys.exit(f"{fails} birth-info mismatches")
+          live2 = json.load(open("/tmp/chart_nobirth.json"))
+          if live2.get("personal") is not None:
+              sys.exit("no-birth request should return personal=null")
+          print("NO-BIRTH CHECK: personal=null OK")
+          print("BIRTH-INFO LIVE CHECK: ALL MATCH")
+          PY
+
       - name: Smoke test /api/qimen-interpret (SSE)
         run: |
           code=$(curl -s -o /tmp/interp.txt -w "%{http_code}" --max-time 60 \
             -X POST "$BASE_URL/api/qimen-interpret" \
             -H "Content-Type: application/json" \
-            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}')
+            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业","birthDate":"1994-05-21","birthTimeIndex":1}')
           echo "POST /api/qimen-interpret -> HTTP $code"
           head -c 300 /tmp/interp.txt; echo
           if [ "$code" = "200" ]; then

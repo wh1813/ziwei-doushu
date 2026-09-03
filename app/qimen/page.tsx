@@ -77,6 +77,62 @@ interface QimenChartPayload {
     warnings: string[];
     palaces: QimenPalace[];
   };
+  personal: PersonalAnalysisPayload | null;
+  chartUnfavorable: ChartUnfavorablePayload | null;
+}
+
+// ── 个人用神定位 / 全盘不利状态（附加检测层，接口见 lib/qimen/remedy.ts）──
+
+interface StemStatesPayload {
+  jiXing: boolean;
+  jiXingDetail: string | null;
+  ruMu: boolean;
+  ruMuDetail: string | null;
+  kongWangShi: boolean;
+  kongWangRi: boolean;
+  kongWangDetail: string | null;
+}
+
+interface SymbolPlacementPayload {
+  role: string;
+  birthStem: string;
+  sourceStem: string;
+  displaySymbol: string;
+  onPlate: "天盘" | "地盘";
+  rawPalace: number | null;
+  palace: number | null;
+  palaceName: string | null;
+  direction: string | null;
+  states: StemStatesPayload;
+  note: string | null;
+}
+
+interface PersonalAnalysisPayload {
+  birth: { date: string; timeIndex: number | null; hourLabel: string | null };
+  baZi: { dayGanZhi: string; yearGanZhi: string };
+  self: SymbolPlacementPayload;
+  partner: SymbolPlacementPayload | null;
+  yearSymbol: SymbolPlacementPayload & {
+    zhifuProxy: { star: string; palace: number; palaceName: string | null; direction: string | null } | null;
+  };
+  liuhe: { palace: number | null; palaceName: string | null; direction: string | null; kongWang: boolean };
+  guGuaHint: string | null;
+  facts: string[];
+  remedyHints: string[];
+}
+
+interface ChartUnfavorableItemPayload {
+  palace: number;
+  palaceName: string;
+  direction: string;
+  skyStem: string;
+  earthStem: string | null;
+  reason: string;
+}
+
+interface ChartUnfavorablePayload {
+  jiXing: ChartUnfavorableItemPayload[];
+  ruMu: ChartUnfavorableItemPayload[];
 }
 
 export default function QimenPage() {
@@ -84,11 +140,18 @@ export default function QimenPage() {
   const [timeIndex, setTimeIndex] = useState<number>(6);
   const [questionType, setQuestionType] = useState("事业");
   const [questionGoal, setQuestionGoal] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [birthTimeIndex, setBirthTimeIndex] = useState<number | null>(null);
   const [loadingChart, setLoadingChart] = useState(false);
   const [chartData, setChartData] = useState<QimenChartPayload | null>(null);
   const [interpretLoading, setInterpretLoading] = useState(false);
   const [answer, setAnswer] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // 出生信息可选：填了日期才随请求提交（起局时间始终为上方当前时间）
+  const birthPayload = birthDate
+    ? { birthDate, birthTimeIndex: birthTimeIndex ?? undefined }
+    : {};
 
   const handleCastChart = async () => {
     if (!solarDate) {
@@ -109,6 +172,7 @@ export default function QimenPage() {
           timeIndex,
           questionType: questionType,
           questionGoal: questionGoal.trim() || undefined,
+          ...birthPayload,
         }),
       });
       if (!res.ok) {
@@ -138,6 +202,7 @@ export default function QimenPage() {
           timeIndex,
           questionType: questionType,
           questionGoal: questionGoal.trim() || undefined,
+          ...birthPayload,
         }),
       });
       if (!res.ok) {
@@ -226,6 +291,37 @@ export default function QimenPage() {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+          </div>
+
+          {/* 出生信息（可选） */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              🎂 出生信息（可选 · 用于定位个人用神）
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                min="1900-01-01"
+                max="2049-12-31"
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              />
+              <select
+                value={birthTimeIndex === null ? "" : String(birthTimeIndex)}
+                onChange={(e) => setBirthTimeIndex(e.target.value === "" ? null : Number(e.target.value))}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="">时辰不详（按正午计）</option>
+                {TIME_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              提供后将按出生八字定位「本人 / 灵魂伴侣 / 生年干」符号落宫并检测击刑、入墓、空亡；
+              起局时间仍以上方当前时间为准（一事一局）
+            </p>
           </div>
 
           {/* 所问事项类型 */}
@@ -373,6 +469,12 @@ export default function QimenPage() {
                       {chart.zhishi.palace === no && (
                         <span className="text-[9px] px-1 rounded bg-emerald-950 text-emerald-300">值使</span>
                       )}
+                      {chartData?.chartUnfavorable?.jiXing.some((x) => x.palace === no) && (
+                        <span className="text-[9px] px-1 rounded bg-red-950 text-red-400">刑</span>
+                      )}
+                      {chartData?.chartUnfavorable?.ruMu.some((x) => x.palace === no) && (
+                        <span className="text-[9px] px-1 rounded bg-red-950 text-red-400">墓</span>
+                      )}
                     </div>
                   </div>
                 );
@@ -405,6 +507,79 @@ export default function QimenPage() {
             {chart.warnings.length > 0 && (
               <div className="mt-4 p-2.5 bg-amber-950/40 border border-amber-900 rounded-lg text-[11px] text-amber-300 leading-relaxed">
                 {chart.warnings.join(" ")}
+              </div>
+            )}
+
+            {/* 全盘不利状态（击刑/入墓，供解局对照） */}
+            {chartData.chartUnfavorable &&
+             (chartData.chartUnfavorable.jiXing.length > 0 || chartData.chartUnfavorable.ruMu.length > 0) && (
+              <div className="mt-4 space-y-1">
+                <div className="text-xs text-slate-500">全盘不利状态（解局依据）</div>
+                {chartData.chartUnfavorable.jiXing.map((it, i) => (
+                  <div key={`jx${i}`} className="text-[11px] text-red-300 leading-relaxed">
+                    · 击刑｜第{it.palace}宫{it.palaceName}（{it.direction}）天盘{it.skyStem} —— {it.reason}
+                  </div>
+                ))}
+                {chartData.chartUnfavorable.ruMu.map((it, i) => (
+                  <div key={`rm${i}`} className="text-[11px] text-red-300 leading-relaxed">
+                    · 入墓｜第{it.palace}宫{it.palaceName}（{it.direction}）天盘{it.skyStem} —— {it.reason}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 个人用神定位（提供出生信息时展示） */}
+            {chartData.personal && (
+              <div className="mt-4 p-3 border border-purple-900/60 bg-purple-950/20 rounded-lg space-y-3">
+                <div className="text-xs text-slate-400">
+                  个人用神定位 · 出生 {chartData.personal.birth.date}
+                  {chartData.personal.birth.hourLabel ? ` ${chartData.personal.birth.hourLabel}` : ""}
+                  <span className="text-slate-600">
+                    {" "}· 八字日柱 {chartData.personal.baZi.dayGanZhi} · 生年 {chartData.personal.baZi.yearGanZhi}
+                  </span>
+                </div>
+                {[
+                  chartData.personal.self,
+                  ...(chartData.personal.partner ? [chartData.personal.partner] : []),
+                  chartData.personal.yearSymbol,
+                ].map((sym, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">{sym.role}</span>
+                    <span className="font-bold text-purple-300">{sym.displaySymbol}</span>
+                    <span className="text-slate-400">
+                      落 {sym.palaceName ?? "?"}（{sym.direction ?? "?"}·第{sym.palace ?? "?"}宫·{sym.onPlate}）
+                    </span>
+                    {(sym.states.jiXing || sym.states.ruMu || sym.states.kongWangShi || sym.states.kongWangRi ? [
+                      ...(sym.states.jiXing ? [{ label: "击刑", cls: "bg-red-950 text-red-400" }] : []),
+                      ...(sym.states.ruMu ? [{ label: "入墓", cls: "bg-red-950 text-red-400" }] : []),
+                      ...(sym.states.kongWangShi || sym.states.kongWangRi ? [{ label: "空亡", cls: "bg-amber-950 text-amber-400" }] : []),
+                    ] : [{ label: "平安", cls: "bg-emerald-950 text-emerald-300" }]).map((t, j) => (
+                      <span key={j} className={`text-[9px] px-1 rounded ${t.cls}`}>{t.label}</span>
+                    ))}
+                    {sym.note && <span className="text-slate-600 w-full">{sym.note}</span>}
+                  </div>
+                ))}
+                <div className="space-y-1">
+                  {chartData.personal.facts.map((f, i) => (
+                    <div key={i} className="text-[11px] text-slate-300 leading-relaxed">· {f}</div>
+                  ))}
+                </div>
+                {chartData.personal.remedyHints.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {chartData.personal.remedyHints.map((h, i) =>
+                      h.length <= 6 ? (
+                        <span
+                          key={i}
+                          className="text-[10px] px-2 py-0.5 rounded-full border border-amber-800 bg-amber-950/60 text-amber-300"
+                        >
+                          解局·{h}
+                        </span>
+                      ) : (
+                        <div key={i} className="w-full text-[11px] text-amber-300 leading-relaxed">· {h}</div>
+                      ),
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

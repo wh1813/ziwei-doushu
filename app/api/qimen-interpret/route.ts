@@ -8,6 +8,11 @@ import {
   extractChartSummary,
   buildQimenPrompt,
 } from '@/lib/qimen/engine';
+import {
+  parseBirthInput,
+  analyzePersonalSymbols,
+  detectChartUnfavorable,
+} from '@/lib/qimen/remedy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,7 +44,8 @@ async function isRateLimited(request: Request): Promise<boolean> {
  *   前端提交起局要素 → 服务端确定性排盘（与 /api/qimen-chart 同一引擎） → 用神与格局规则匹配
  *   → 防幻觉 Prompt → 复用 streamChatCompletion（DeepSeek，服务端密钥）→ SSE 输出
  *
- * 请求体：{ solarDate, timeIndex, questionType?, questionGoal? }
+ * 请求体：{ solarDate, timeIndex, questionType?, questionGoal?, birthDate?, birthTimeIndex? }
+ *   - 起局时间 = 当前时间；可选出生信息仅用于预计算个人用神落宫（LLM 只引用、严禁重算）。
  * 要素缺失时返回 400 + 具体缺失文案（NEED_CLARIFICATION 语义），严禁强排。
  */
 export async function POST(request: Request): Promise<Response> {
@@ -71,6 +77,10 @@ export async function POST(request: Request): Promise<Response> {
   const validationError = validateQimenInput({ solarDate, timeIndex });
   if (validationError) return errorResponse(validationError, 400);
 
+  // 出生信息可选：提供即校验，格式非法直接 400
+  const birthParse = parseBirthInput(body as { birthDate?: unknown; birthTimeIndex?: unknown });
+  if (birthParse.error) return errorResponse(birthParse.error, 400);
+
   const normalizedType = typeof questionType === 'string' ? questionType.trim().slice(0, 20) : '';
   const normalizedGoal = typeof questionGoal === 'string' ? questionGoal.trim().slice(0, 500) : '';
   const chartQuestion = [normalizedType, normalizedGoal].filter(Boolean).join('：') || '奇门全面解盘';
@@ -91,6 +101,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const summary = extractChartSummary(result);
+
+  // ── 附加检测层：个人用神定位（可选出生信息）+ 全盘不利状态，全部预计算、LLM 只引用 ──
+  const extras = {
+    personal: birthParse.birth ? analyzePersonalSymbols(result, birthParse.birth) : null,
+    chartUnfavorable: detectChartUnfavorable(result.chart),
+  };
+
   const { systemPrompt, userPrompt, chartContext } = buildQimenPrompt(
     {
       solarDate: solarDate as string,
@@ -100,6 +117,7 @@ export async function POST(request: Request): Promise<Response> {
     },
     result,
     summary,
+    extras,
   );
 
   // ── 第三步：调用 LLM（低发散、防幻觉，复用现有流式基建）──
