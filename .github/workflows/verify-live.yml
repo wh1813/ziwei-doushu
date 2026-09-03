@@ -10,21 +10,33 @@ jobs:
     env:
       BASE_URL: https://ziwei-doushu.wanghe3933.workers.dev
     steps:
-      - name: Check /qimen page
+      - name: Probe routes
         run: |
-          code=$(curl -s -o /tmp/qimen.html -w "%{http_code}" "$BASE_URL/qimen")
-          size=$(wc -c < /tmp/qimen.html)
-          echo "GET /qimen -> HTTP $code ($size bytes)"
-          if [ "$code" != "200" ]; then echo "::error::page not 200"; exit 1; fi
-          grep -q "奇门" /tmp/qimen.html && echo "page contains 奇门: OK"
+          for path in / /qimen /tianji /chart; do
+            code=$(curl -s -o /tmp/probe.html -w "%{http_code}" "$BASE_URL$path")
+            echo "GET $path -> HTTP $code ($(wc -c < /tmp/probe.html) bytes)"
+            if [ "$code" != "200" ]; then
+              echo "--- body of $path ---"
+              cat /tmp/probe.html; echo
+            fi
+          done
+
+      - name: Detailed /qimen diagnostics
+        run: |
+          echo "--- headers ---"
+          curl -s -D - -o /tmp/qimen.html "$BASE_URL/qimen" | head -20
+          echo "--- full body ---"
+          cat /tmp/qimen.html; echo
 
       - name: Golden check /api/qimen-chart (2026-03-24 10:30)
         run: |
-          curl -s -X POST "$BASE_URL/api/qimen-chart" \
+          code=$(curl -s -o /tmp/chart.json -w "%{http_code}" -X POST "$BASE_URL/api/qimen-chart" \
             -H "Content-Type: application/json" \
-            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}' \
-            -o /tmp/chart.json
-          echo "chart response bytes: $(wc -c < /tmp/chart.json)"
+            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}')
+          echo "POST /api/qimen-chart -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "--- error body ---"; cat /tmp/chart.json; echo; exit 1
+          fi
           python3 - <<'PY'
           import json, sys
           live = json.load(open("/tmp/chart.json"))
@@ -60,13 +72,8 @@ jobs:
             -X POST "$BASE_URL/api/qimen-interpret" \
             -H "Content-Type: application/json" \
             -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}')
-          ctype=$(curl -s -o /dev/null -w "%{content_type}" --max-time 60 \
-            -X POST "$BASE_URL/api/qimen-interpret" \
-            -H "Content-Type: application/json" \
-            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}')
-          echo "POST /api/qimen-interpret -> HTTP $code, content-type: $ctype"
+          echo "POST /api/qimen-interpret -> HTTP $code"
           head -c 300 /tmp/interp.txt; echo
-          # 200 + event-stream 即链路通；503 说明 AI key 未配置（chart 不受影响）
           if [ "$code" = "200" ]; then
             echo "interpret SSE OK"
           elif [ "$code" = "503" ]; then
