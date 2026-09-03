@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
-import { getAiConfig } from '@/lib/ai/config';
-import { streamChatCompletion } from '@/lib/ai/provider';
+import { getProviderChain } from '@/lib/ai/config';
+import { streamChatCompletionWithFallback } from '@/lib/ai/provider';
 import { writeQueryLog } from '@/lib/logging/query-log';
 import {
   validateTianjiInput,
@@ -98,14 +98,13 @@ export async function POST(request: Request): Promise<Response> {
     patterns,
   );
 
-  // ── 第三步：调用 LLM（低发散、防幻觉，复用现有流式基建）──
-  const baseConfig = getAiConfig();
+  // ── 第三步：调用 LLM（低发散、防幻觉，按 provider 优先级链依次回退）──
   // 深度解读篇幅更长：上调输出上限与超时（均在基建安全区间内）
-  const tianjiConfig = {
-    ...baseConfig,
-    maxOutputTokens: Math.max(baseConfig.maxOutputTokens, 3000),
-    timeoutMs: Math.max(baseConfig.timeoutMs, 30000),
-  };
+  const chain = getProviderChain().map((config) => ({
+    ...config,
+    maxOutputTokens: Math.max(config.maxOutputTokens, 3000),
+    timeoutMs: Math.max(config.timeoutMs, 30000),
+  }));
 
   const startedAt = Date.now();
   const logId = crypto.randomUUID();
@@ -113,8 +112,8 @@ export async function POST(request: Request): Promise<Response> {
   const country = request.headers.get('cf-ipcountry');
 
   try {
-    const completion = await streamChatCompletion(
-      tianjiConfig,
+    const completion = await streamChatCompletionWithFallback(
+      chain,
       systemPrompt,
       chartContext,
       [{ role: 'user', content: userPrompt }],

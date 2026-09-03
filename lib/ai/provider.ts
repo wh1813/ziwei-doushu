@@ -8,6 +8,9 @@ export interface ChatMessage {
 export interface ChatCompletionResult {
   content: string;
   stream: ReadableStream<Uint8Array>;
+  /** 实际服务的 provider（fallback 命中后用于日志/观测） */
+  providerId?: AiConfig['providerId'];
+  model?: string;
 }
 
 interface CompletionResponse {
@@ -23,6 +26,10 @@ function sanitizePublicOutput(text: string): string {
     .trim();
 }
 
+/**
+ * 单 provider 同步补全（非流式上游 → 包装为伪 SSE）。
+ * `thinking` 参数仅对 DeepSeek 兼容网关附加（OpenRouter/商汤的 OpenAI 兼容接口不识别该字段）。
+ */
 export async function streamChatCompletion(
   config: AiConfig,
   systemPrompt: string,
@@ -42,7 +49,7 @@ export async function streamChatCompletion(
       body: JSON.stringify({
         model: config.model,
         stream: false,
-        thinking: { type: 'disabled' },
+        ...(config.providerId === 'deepseek' ? { thinking: { type: 'disabled' } } : {}),
         max_tokens: config.maxOutputTokens,
         temperature: 0.5,
         messages: [
@@ -55,7 +62,7 @@ export async function streamChatCompletion(
     });
 
     if (!upstream.ok) {
-      console.error('AI upstream rejected request', upstream.status);
+      console.error('AI upstream rejected request', upstream.status, config.providerId, config.model);
       throw new Error(`AI upstream failed with status ${upstream.status}`);
     }
 
@@ -76,7 +83,7 @@ export async function streamChatCompletion(
       },
     });
 
-    return { content, stream };
+    return { content, stream, providerId: config.providerId, model: config.model };
   } catch (error) {
     const message = error instanceof Error && error.name === 'AbortError'
       ? 'AI upstream timed out'
@@ -88,4 +95,29 @@ export async function streamChatCompletion(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * 按优先级依次尝试 provider 链（链序由 lib/ai/config 的 getProviderChain 决定：
+ * OpenRouter 免费模型 → 商汤日日新免费档 → 原 DeepSeek 兜底），任一成功立即返回；
+ * 全部失败时抛出聚合错误（含每个 provider 的失败原因，便于排查限流/超时）。
+ */
+export async function streamChatCompletionWithFallback(
+  configs: AiConfig[],
+  systemPrompt: string,
+  chartContext: string,
+  messages: ChatMessage[],
+): Promise<ChatCompletionResult> {
+  if (configs.length === 0) throw new Error('AI service is not configured');
+  const failures: string[] = [];
+  for (const config of configs) {
+    try {
+      return await streamChatCompletion(config, systemPrompt, chartContext, messages);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      failures.push(`[${config.providerId}/${config.model}] ${message}`);
+      console.warn(`AI provider failed, trying next`, `${config.providerId}/${config.model}:`, message);
+    }
+  }
+  throw new Error(`All AI providers failed: ${failures.join(' | ')}`);
 }

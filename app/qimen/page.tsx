@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
 const TIME_OPTIONS = [
@@ -152,6 +152,39 @@ export default function QimenPage() {
   const birthPayload = birthDate
     ? { birthDate, birthTimeIndex: birthTimeIndex ?? undefined }
     : {};
+
+  // 出生信息本地记忆：填一次即记住，此后无需重复提供（锁定日干/生年天干）
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("qimen_birth");
+      if (raw) {
+        const saved = JSON.parse(raw) as { birthDate?: string; birthTimeIndex?: number | null };
+        if (saved && typeof saved.birthDate === "string" && saved.birthDate) {
+          setBirthDate(saved.birthDate);
+        }
+        if (saved && typeof saved.birthTimeIndex === "number") {
+          setBirthTimeIndex(saved.birthTimeIndex);
+        }
+      }
+    } catch {
+      // 本地存储不可用时静默降级：每次手动填写
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (birthDate) {
+        window.localStorage.setItem(
+          "qimen_birth",
+          JSON.stringify({ birthDate, birthTimeIndex }),
+        );
+      } else {
+        window.localStorage.removeItem("qimen_birth");
+      }
+    } catch {
+      // 忽略写入失败（隐私模式等）
+    }
+  }, [birthDate, birthTimeIndex]);
 
   const handleCastChart = async () => {
     if (!solarDate) {
@@ -319,8 +352,9 @@ export default function QimenPage() {
               </select>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              提供后将按出生八字定位「本人 / 灵魂伴侣 / 生年干」符号落宫并检测击刑、入墓、空亡；
-              起局时间仍以上方当前时间为准（一事一局）
+              只需填写一次，本机自动记住（localStorage），此后起局无需再提供；
+              系统将按出生八字锁定「本人 / 灵魂伴侣 / 生年天干」符号并检测击刑、入墓、空亡。
+              起局时间始终为上方当前时间（一事一局），解盘时先纯盘面解读、再定位个人用神宫位
             </p>
           </div>
 

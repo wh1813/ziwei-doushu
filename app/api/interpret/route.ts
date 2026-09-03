@@ -1,7 +1,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { buildChartContext, isChartLike } from '@/lib/ai/chart-context';
-import { getAiConfig } from '@/lib/ai/config';
-import { streamChatCompletion, type ChatMessage } from '@/lib/ai/provider';
+import { getProviderChain } from '@/lib/ai/config';
+import { streamChatCompletionWithFallback, type ChatMessage } from '@/lib/ai/provider';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompt';
 import { writeQueryLog } from '@/lib/logging/query-log';
 
@@ -86,8 +86,8 @@ export async function POST(request: Request): Promise<Response> {
   const country = request.headers.get('cf-ipcountry');
 
   try {
-    const completion = await streamChatCompletion(
-      getAiConfig(),
+    const completion = await streamChatCompletionWithFallback(
+      getProviderChain(),
       SYSTEM_PROMPT,
       chartContext,
       normalizedMessages,

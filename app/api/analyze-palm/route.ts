@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getProviderChain } from '@/lib/ai/config';
 
 // 兼容读取 OpenNext / Cloudflare 环境变量与机密
 function getEnv(key: string): string | undefined {
@@ -173,7 +174,7 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
 // 阶段 B：DeepSeek 深度命理综合鉴析
 // =====================================================================
 
-async function deepseekReport(opts: {
+async function reportOnce(opts: {
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -266,6 +267,30 @@ ${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未单独提问，�
   return parsed;
 }
 
+/**
+ * 按 provider 优先级链依次尝试生成深度报告（OpenRouter → 商汤 → 原 DeepSeek 兜底），
+ * 任一 provider 成功立即返回；全部失败抛出聚合错误（由调用方降级为特征解析兜底）。
+ */
+async function deepseekReport(opts: {
+  configs: Array<{ providerId?: string; baseUrl: string; apiKey: string; model: string }>;
+  handSide: 'left' | 'right';
+  features: any;
+  userQuestion?: string;
+}): Promise<any> {
+  if (!opts.configs.length) throw new Error('AI service is not configured');
+  const failures: string[] = [];
+  for (const cfg of opts.configs) {
+    try {
+      return await reportOnce({ ...opts, ...cfg });
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      failures.push(`[${cfg.providerId || 'unknown'}/${cfg.model}] ${msg}`);
+      console.warn(`Palm report provider failed, trying next: ${cfg.providerId || 'unknown'}/${cfg.model}:`, msg);
+    }
+  }
+  throw new Error(`All AI providers failed: ${failures.join(' | ')}`);
+}
+
 // =====================================================================
 // POST 统一入口
 // =====================================================================
@@ -318,18 +343,19 @@ export async function POST(request: NextRequest) {
       console.warn('[R2 Warning] 未找到有效的 PALM_IMAGES_BUCKET 实例');
     }
 
-    // 3. DeepSeek 大模型深度命理报告生成
-    const deepseekKey = getEnv('AI_API_KEY') || getEnv('PALM_DEEPSEEK_API_KEY');
-    const deepseekUrl = getEnv('AI_BASE_URL') || getEnv('PALM_DEEPSEEK_BASE_URL') || 'https://api.deepseek.com';
-    const deepseekModel = getEnv('AI_MODEL') || 'deepseek-v4-flash';
+    // 3. 大模型深度命理报告生成（按 provider 优先级链依次回退：OpenRouter → 商汤 → DeepSeek 兜底）
+    const chain = getProviderChain().map((c) => ({
+      providerId: c.providerId,
+      baseUrl: c.baseUrl,
+      apiKey: c.apiKey,
+      model: c.model,
+    }));
 
     let report: any = null;
-    if (deepseekKey) {
+    if (chain.length > 0) {
       try {
         report = await deepseekReport({
-          apiKey: deepseekKey,
-          baseUrl: deepseekUrl,
-          model: deepseekModel,
+          configs: chain,
           handSide: currentHandSide,
           features,
           userQuestion: typeof question === 'string' ? question : '',
