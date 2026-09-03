@@ -40,27 +40,29 @@ jobs:
           python3 - <<'PY'
           import json, sys
           live = json.load(open("/tmp/chart.json"))
+          chart = live.get("chart") or {}
           def g(d, *names):
               for n in names:
                   if n in d: return d[n]
               return None
           checks = [
-              ("dun_type",    g(live, "dunType", "dun_type"),          "阳遁"),
-              ("ju_number",   g(live, "juNumber", "ju_number"),        1),
-              ("yuan",        g(live, "yuan"),                          "上元"),
-              ("hidden_yi",   g(live, "hiddenYi", "hidden_yi"),        "壬"),
-              ("zhifu.star",  (g(live, "zhifu") or {}).get("star"),    "天芮"),
-              ("zhifu.palace",(g(live, "zhifu") or {}).get("palace"),  9),
-              ("zhishi.door", (g(live, "zhishi") or {}).get("door"),   "死门"),
-              ("zhishi.palace",(g(live, "zhishi") or {}).get("palace"),9),
+              ("active_jie",  g(live.get("jieqi") or {}, "activeJie"), "惊蛰"),
+              ("dun_type",    g(chart, "dunType", "dun_type"),          "阳遁"),
+              ("ju_number",   g(chart, "juNumber", "ju_number"),        1),
+              ("yuan",        g(chart, "yuan"),                          "上元"),
+              ("hidden_yi",   g(chart, "hiddenYi", "hidden_yi"),       "壬"),
+              ("zhifu.star",  (g(chart, "zhifu") or {}).get("star"),    "天芮"),
+              ("zhifu.palace",(g(chart, "zhifu") or {}).get("palace"),  9),
+              ("zhishi.door", (g(chart, "zhishi") or {}).get("door"),   "死门"),
+              ("zhishi.palace",(g(chart, "zhishi") or {}).get("palace"), 9),
           ]
           fails = 0
           for name, got, want in checks:
               ok = got == want
               print(("OK  " if ok else "FAIL") + f" {name}: live={got} expect={want}")
               fails += 0 if ok else 1
-          pal = g(live, "palaces") or {}
-          print("palaces:", len(pal), "| patterns:", g(live, "detectedPatterns", "detected_patterns"))
+          pal = g(chart, "palaces") or []
+          print("palaces:", len(pal), "| patterns:", len(g(chart, "detectedPatterns", "detected_patterns") or []))
           if fails or len(pal) != 9:
               sys.exit(f"{fails} golden mismatches / palaces={len(pal)}")
           print("GOLDEN LIVE CHECK: ALL MATCH")
