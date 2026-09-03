@@ -1,0 +1,28 @@
+name: debug-tail
+
+# 诊断 Worker 运行时异常（error 1101）：wrangler tail 抓异常栈
+on:
+  workflow_dispatch:
+
+jobs:
+  tail:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Tail worker and trigger failing requests
+        run: |
+          npx --yes wrangler@4 tail ziwei-doushu --format pretty > tail.log 2>&1 &
+          TAIL_PID=$!
+          sleep 12
+          echo "--- triggering requests ---"
+          curl -s "https://ziwei-doushu.wanghe3933.workers.dev/" -o /dev/null -w "GET / -> %{http_code}\n" || true
+          curl -s -X POST "https://ziwei-doushu.wanghe3933.workers.dev/api/qimen-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2026-03-24","timeIndex":5}' -o /dev/null -w "POST chart -> %{http_code}\n" || true
+          sleep 12
+          kill $TAIL_PID 2>/dev/null || true
+          sleep 2
+          echo "=== tail log ==="
+          cat tail.log
