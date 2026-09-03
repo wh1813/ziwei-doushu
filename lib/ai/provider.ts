@@ -27,8 +27,25 @@ function sanitizePublicOutput(text: string): string {
 }
 
 /**
+ * 按端点差异决定"关闭思考模式"参数（解盘场景需要低延迟、content 直接可读）：
+ * - 商汤 glm 系（glm-5.2 等）：只认 `reasoning_effort: 'none'`；发 thinking 会 400
+ *   （"invalid thinking type, only be disabled when reasoning effort is none"）
+ * - 商汤 deepseek 系 / 原 DeepSeek 兼容网关：`thinking: { type: 'disabled' }`
+ *   （不关则输出全进 reasoning_content，content 为空）
+ * - OpenRouter：透传官方模型默认行为，不加字段（未知字段可能被部分模型拒绝）
+ */
+function noThinkingPolicy(config: AiConfig): Record<string, unknown> {
+  if (config.providerId === 'sensenova') {
+    return config.model.startsWith('glm')
+      ? { reasoning_effort: 'none' }
+      : { thinking: { type: 'disabled' } };
+  }
+  if (config.providerId === 'deepseek') return { thinking: { type: 'disabled' } };
+  return {};
+}
+
+/**
  * 单 provider 同步补全（非流式上游 → 包装为伪 SSE）。
- * `thinking` 参数仅对 DeepSeek 兼容网关附加（OpenRouter/商汤的 OpenAI 兼容接口不识别该字段）。
  */
 export async function streamChatCompletion(
   config: AiConfig,
@@ -49,7 +66,7 @@ export async function streamChatCompletion(
       body: JSON.stringify({
         model: config.model,
         stream: false,
-        ...(config.providerId === 'deepseek' ? { thinking: { type: 'disabled' } } : {}),
+        ...noThinkingPolicy(config),
         max_tokens: config.maxOutputTokens,
         temperature: 0.5,
         messages: [
