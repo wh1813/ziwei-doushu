@@ -1,28 +1,47 @@
 name: debug-tail
 
-# 诊断 Worker 运行时异常（error 1101）：wrangler tail 抓异常栈
+# 诊断 Worker 运行时异常（error 1101）：Workers Logs SQL 查询 + wrangler tail
 on:
   workflow_dispatch:
 
 jobs:
-  tail:
+  debug:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - name: Tail worker and trigger failing requests
+      - name: Query Workers Logs (observability SQL)
         run: |
-          npx --yes wrangler@4 tail ziwei-doushu --format pretty > tail.log 2>&1 &
-          TAIL_PID=$!
-          sleep 12
-          echo "--- triggering requests ---"
-          curl -s "https://ziwei-doushu.wanghe3933.workers.dev/" -o /dev/null -w "GET / -> %{http_code}\n" || true
-          curl -s -X POST "https://ziwei-doushu.wanghe3933.workers.dev/api/qimen-chart" \
+          NOW_MS=$(date +%s%3N)
+          FROM_MS=$((NOW_MS - 7200000))
+          cat > query.json <<EOF
+          {
+            "queryId": "workers-logs-debug",
+            "timeframe": {"from": $FROM_MS, "to": $NOW_MS},
+            "parameters": {
+              "datasets": ["cloudflare-workers"],
+              "filters": "{\"key\":\"$metadata.service\",\"operation\":\"eq\",\"value\":\"ziwei-doushu\",\"type\":\"string\"}"
+            },
+            "limit": 30,
+            "samplingInterval": "auto"
+          }
+          EOF
+          echo "--- telemetry query ---"
+          curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/observability/telemetry/query" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"solarDate":"2026-03-24","timeIndex":5}' -o /dev/null -w "POST chart -> %{http_code}\n" || true
-          sleep 12
-          kill $TAIL_PID 2>/dev/null || true
-          sleep 2
+            -d @query.json | head -c 6000 || true
+          echo
+
+      - name: Trigger failing request
+        run: |
+          curl -s "https://ziwei-doushu.wanghe3933.workers.dev/" -o /dev/null -w "GET / -> %{http_code}\n" || true
+          sleep 3
+
+      - name: wrangler tail (natural timeout for flush)
+        run: |
+          timeout --signal=TERM 45 npx --yes wrangler@4 tail ziwei-doushu --format pretty > tail.log 2>&1 || true
           echo "=== tail log ==="
           cat tail.log
