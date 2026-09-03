@@ -14,34 +14,49 @@ jobs:
       - name: Query Workers Logs (observability SQL)
         run: |
           NOW_MS=$(date +%s%3N)
-          FROM_MS=$((NOW_MS - 7200000))
-          cat > query.json <<EOF
+          FROM_MS=$((NOW_MS - 10800000))
           {
-            "queryId": "workers-logs-debug",
-            "timeframe": {"from": $FROM_MS, "to": $NOW_MS},
-            "parameters": {
-              "datasets": ["cloudflare-workers"],
-              "filters": "{\"key\":\"$metadata.service\",\"operation\":\"eq\",\"value\":\"ziwei-doushu\",\"type\":\"string\"}"
-            },
-            "limit": 30,
-            "samplingInterval": "auto"
+            printf '{"queryId":"workers-logs-debug","timeframe":{"from":%s,"to":%s},"parameters":{"datasets":["cloudflare-workers"],"filters":[{"key":"$metadata.service","operation":"eq","value":"ziwei-doushu","type":"string"}]},"limit":30,"samplingInterval":"auto"}' "$FROM_MS" "$NOW_MS" > query.json
           }
-          EOF
           echo "--- telemetry query ---"
           curl -s -X POST \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/observability/telemetry/query" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
-            -d @query.json | head -c 6000 || true
-          echo
+            -d @query.json -o resp.json || true
+          python3 - <<'PY'
+          import json
+          try:
+              r = json.load(open("resp.json"))
+          except Exception as e:
+              print("resp parse error:", e)
+              print(open("resp.json").read()[:2000])
+              raise SystemExit(0)
+          print("success:", r.get("success"))
+          if not r.get("success"):
+              print(json.dumps(r, indent=1)[:3000])
+              raise SystemExit(0)
+          events = (r.get("result") or {}).get("events") or []
+          print("events:", len(events))
+          for e in events[:20]:
+              msg = e.get("message") or ""
+              err = json.dumps(e.get("error"), ensure_ascii=False) if e.get("error") else ""
+              lvl = (e.get("$metadata") or {}).get("level") or e.get("level") or ""
+              print(f"[{lvl}] {msg[:300]}")
+              if err and err != "null":
+                  print("   error:", err[:500])
+          PY
 
-      - name: Trigger failing request
+      - name: wrangler tail with in-step trigger
         run: |
+          (timeout --signal=TERM 55 npx --yes wrangler@4 tail ziwei-doushu --format pretty > tail.log 2>&1) || true
+          TAIL_PID=$!
+          sleep 18
+          echo "--- triggering requests (tail is live) ---"
           curl -s "https://ziwei-doushu.wanghe3933.workers.dev/" -o /dev/null -w "GET / -> %{http_code}\n" || true
-          sleep 3
-
-      - name: wrangler tail (natural timeout for flush)
-        run: |
-          timeout --signal=TERM 45 npx --yes wrangler@4 tail ziwei-doushu --format pretty > tail.log 2>&1 || true
+          curl -s -X POST "https://ziwei-doushu.wanghe3933.workers.dev/api/qimen-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2026-03-24","timeIndex":5}' -o /dev/null -w "POST chart -> %{http_code}\n" || true
+          wait $TAIL_PID 2>/dev/null || true
           echo "=== tail log ==="
           cat tail.log
