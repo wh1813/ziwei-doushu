@@ -8,7 +8,6 @@ import {
   extractNatalSummary,
   checkTianjiPatterns,
   buildTianjiPrompt,
-  type TianjiInput,
 } from '@/lib/tianji/engine';
 
 export const runtime = 'nodejs';
@@ -146,7 +145,7 @@ export async function POST(request: Request): Promise<Response> {
       sessionId,
       question: normalizedQuestion || '天纪全面剖析',
       answer: null,
-      chartSummary,
+      chartSummary: chartContext,
       status: 'error',
       errorMessage,
       durationMs: Date.now() - startedAt,
