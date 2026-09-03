@@ -8,6 +8,7 @@ import {
   analyzePersonalSymbols,
   detectChartUnfavorable,
 } from '@/lib/qimen/remedy';
+import { saveQimenRecord } from '@/lib/qimen/history';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -92,6 +93,8 @@ export async function POST(request: Request): Promise<Response> {
     // 全盘不利状态（击刑/入墓）恒返回；个人用神仅在提供出生信息时计算
     const chartUnfavorable = detectChartUnfavorable(result.chart);
     const personal = birthParse.birth ? analyzePersonalSymbols(result, birthParse.birth) : null;
+    // ── 第四步：起局历史落库（best-effort：D1 不可用/表未建时静默跳过，不影响排盘）──
+    await saveQimenRecord(result);
     return Response.json(
       { ...result, personal, chartUnfavorable },
       {

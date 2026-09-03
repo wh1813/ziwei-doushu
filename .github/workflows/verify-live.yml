@@ -119,6 +119,30 @@ jobs:
           print("BIRTH-INFO LIVE CHECK: ALL MATCH")
           PY
 
+      - name: Probe /api/qimen-history
+        run: |
+          code=$(curl -s -o /tmp/qh.json -w "%{http_code}" "$BASE_URL/api/qimen-history?limit=5")
+          echo "GET /api/qimen-history?limit=5 -> HTTP $code"
+          head -c 400 /tmp/qh.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::unexpected status $code"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, sys
+          data = json.load(open("/tmp/qh.json"))
+          if "available" not in data or not isinstance(data.get("records"), list):
+              sys.exit("malformed qimen-history response: missing available/records")
+          if data["available"]:
+              n = len(data["records"])
+              print(f"qimen-history OK: available=true, records={n}")
+              if n == 0:
+                  print("::warning::table exists but 0 records - golden chart POSTs above should have saved (best-effort save may be failing)")
+          else:
+              print("::warning::qimen-history available=false - D1 migration 0003 not applied yet (feature degrades gracefully)")
+          print("QIMEN-HISTORY PROBE: PASS")
+          PY
+
       - name: Smoke test /api/qimen-interpret (SSE)
         run: |
           code=$(curl -s -o /tmp/interp.txt -w "%{http_code}" --max-time 60 \
