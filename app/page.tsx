@@ -111,6 +111,14 @@ const ENTRIES = [
     icon: '✋',
     accent: 'blue',
   },
+  {
+    key: 'qimen',
+    title: '奇门遁甲',
+    desc: '确定性起局排盘零幻觉，AI 依用神与格局解盘，给出方位与时机建议。',
+    cta: '开始起局',
+    icon: '▦',
+    accent: 'teal',
+  },
 ];
 
 // ─── 主页（精简版：排盘 + 天纪 + 手相）─────────────────────
@@ -177,6 +185,13 @@ export default function HomePage() {
             style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
             手相
           </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => router.push('/qimen')}
+            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
+            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
+            奇门
+          </motion.button>
         </div>
       </nav>
 
@@ -208,19 +223,25 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.45 }}
             className="text-sm max-w-xl mx-auto leading-relaxed mb-12"
             style={{ color: c.textMuted }}>
-            紫微排盘 · 天纪解读 · 手相分析 — 简易操作，即刻解读
+            紫微排盘 · 天纪解读 · 手相分析 · 奇门遁甲 — 简易操作，即刻解读
           </motion.p>
 
-          {/* 三大功能入口 */}
+          {/* 四大功能入口 */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.6 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto">
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
             {ENTRIES.map((e) => {
               const isGold = e.accent === 'gold';
-              const accentColor = e.accent === 'purple' ? '#a855f7' : isGold ? c.goldSolid : '#3a78d4';
+              const accentColor = e.accent === 'purple'
+                ? '#a855f7'
+                : e.accent === 'teal'
+                  ? '#14b8a6'
+                  : isGold ? c.goldSolid : '#3a78d4';
               const accentBorder = e.accent === 'purple'
                 ? 'rgba(168,85,247,0.35)'
-                : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
+                : e.accent === 'teal'
+                  ? 'rgba(20,184,166,0.35)'
+                  : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
               return (
                 <motion.button
                   key={e.key}
