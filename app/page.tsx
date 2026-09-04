@@ -96,14 +96,6 @@ const ENTRIES = [
     accent: 'gold',
   },
   {
-    key: 'tianji',
-    title: '天纪深度解读',
-    desc: '算法严格排盘零幻觉，自动匹配《天纪》格局，AI 依盘推演事业与进路。',
-    cta: '开始推演',
-    icon: '☰',
-    accent: 'purple',
-  },
-  {
     key: 'palm',
     title: '手相分析',
     desc: '上传手掌照片，AI 识别掌纹特征，解读性格、事业与感情。',
@@ -121,7 +113,7 @@ const ENTRIES = [
   },
 ];
 
-// ─── 主页（精简版：排盘 + 天纪 + 手相）─────────────────────
+// ─── 主页（精简版：排盘 + 手相 + 奇门）─────────────────────
 export default function HomePage() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -173,13 +165,6 @@ export default function HomePage() {
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/tianji')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            天纪
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
             onClick={() => router.push('/palm')}
             className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
             style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
@@ -223,13 +208,13 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.45 }}
             className="text-sm max-w-xl mx-auto leading-relaxed mb-12"
             style={{ color: c.textMuted }}>
-            紫微排盘 · 天纪解读 · 手相分析 · 奇门遁甲 — 简易操作，即刻解读
+            紫微排盘 · 手相分析 · 奇门遁甲 — 简易操作，即刻解读
           </motion.p>
 
-          {/* 四大功能入口 */}
+          {/* 三大功能入口 */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.6 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
+            className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto">
             {ENTRIES.map((e) => {
               const isGold = e.accent === 'gold';
               const accentColor = e.accent === 'purple'

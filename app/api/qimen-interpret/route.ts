@@ -27,6 +27,43 @@ function errorResponse(message: string, status: number): Response {
   return Response.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
+// 前端为纯文本渲染（whitespace-pre-wrap），Markdown 符号会原样显示成乱码。
+// Prompt 已禁用 Markdown 与开场白（【输出格式铁律】），此处做代码级兜底清洗：
+// 1) 剔除开头元话语行（"我将严格遵循……""好的，……""以下是为您……"等）
+// 2) 全文剔除 #、*、` 与行首引用符/无序列表符
+const QIMEN_META_LINE_RE =
+  /(我将|我会|以下是|为您解读|为您剖析|严格遵循|遵循.{0,12}(体系|方法)|作为一(位|名))/;
+
+function sanitizeQimenOutput(raw: string): string {
+  const lines = raw.replace(/\r\n/g, '\n').split('\n');
+  // 仅清理正文最前部的元话语行（短行且非【】段落标题），逐行剔除直到遇到正文
+  while (lines.length > 0) {
+    const first = lines.findIndex((l) => l.trim() !== '');
+    if (first === -1) {
+      lines.length = 0;
+      break;
+    }
+    const line = lines[first].trim();
+    if (line.length < 80 && !line.startsWith('【') && QIMEN_META_LINE_RE.test(line)) {
+      lines.splice(first, 1);
+    } else {
+      break;
+    }
+  }
+  return lines
+    .map((l) => {
+      let s = l.replace(/^\s*#{1,6}\s*/, ''); // 行首标题井号
+      s = s.replace(/\*/g, ''); // 粗体/斜体星号（本域文本中 * 无实义）
+      s = s.replace(/`/g, ''); // 行内代码反引号
+      s = s.replace(/^\s*>\s?/, ''); // 引用符
+      s = s.replace(/^\s*[-•]\s+/, '· '); // 无序列表符 → 间隔点
+      return s;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 async function isRateLimited(request: Request): Promise<boolean> {
   try {
     const { env } = getCloudflareContext();
@@ -140,18 +177,28 @@ export async function POST(request: Request): Promise<Response> {
       chartContext,
       [{ role: 'user', content: userPrompt }],
     );
+    // 兜底清洗：剔除元话语开场与 Markdown 符号（前端纯文本渲染），再包装为 SSE
+    const cleaned = sanitizeQimenOutput(completion.content);
     await writeQueryLog({
       id: logId,
       sessionId,
       question: chartQuestion,
-      answer: completion.content,
+      answer: cleaned,
       chartSummary: chartContext,
       status: 'success',
       errorMessage: null,
       durationMs: Date.now() - startedAt,
       country,
     });
-    return new Response(completion.stream, {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: { text: cleaned } })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
