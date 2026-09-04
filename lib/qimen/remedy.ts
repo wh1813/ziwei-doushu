@@ -10,7 +10,7 @@ import type { QimenChart, QimenFullResult } from './engine';
  *     日干支按八字换日规则即 23:00 后算次日，与 lunar-javascript Exact 系列一致）
  *  2. 用神落宫定位（在"当前时间起好的盘"中定位）：
  *     - 本人 = 出生日干（日干为甲者，取出生旬首所遁之仪代理入盘定位）
- *     - 灵魂伴侣 = 本人符号的天干五合之干（丁壬合、乙庚合、甲己合、丙辛合、戊癸合）
+ *     - 日干合神 = 本人符号的天干五合之干（丁壬合、乙庚合、甲己合、丙辛合、戊癸合）
  *     - 生年干（财富/事业加看）：生年干为甲者以值符为代表，另以遁仪戊作盘面代理
  *  3. 不利状态检测：六仪击刑 / 天盘干入墓 / 空亡（时旬空为主、日旬空为辅）
  *  4. 事实化输出：全部落宫与状态由本模块预计算，LLM 只引用、严禁自行重定位
@@ -149,7 +149,7 @@ export interface StemStates {
 }
 
 export interface SymbolPlacement {
-  role: string; // 本人（八字日干）/ 灵魂伴侣（日干所合）/ 生年干
+  role: string; // 本人（八字日干）/ 日干合神（日干五合之干）/ 生年干
   birthStem: string; // 出生干（甲未代理前的原始干）
   sourceStem: string; // 实际用于定位与状态检测的盘面天干（甲取遁仪代理）
   displaySymbol: string; // 展示用符号
@@ -361,15 +361,15 @@ export function analyzePersonalSymbols(result: QimenFullResult, birth: BirthInpu
   }
   const self = buildPlacement(chart, '本人（八字日干）', dayStem, selfSourceStem, selfDisplay, selfNote);
 
-  // ── 灵魂伴侣符号：本人符号的天干五合之干 ──
+  // ── 日干合神符号：本人符号的天干五合之干 ──
   const partnerStem = WU_HE_PARTNER[selfSourceStem];
   const partner = buildPlacement(
     chart,
-    '灵魂伴侣（日干所合之干）',
+    '日干合神（日干五合之干）',
     partnerStem,
     partnerStem,
     partnerStem,
-    `${selfDisplay} 与 ${partnerStem} 天干五合（${selfSourceStem}${partnerStem}相合），${partnerStem} 代表理想伴侣/灵魂伴侣`,
+    `${selfDisplay} 与 ${partnerStem} 天干五合（${selfSourceStem}${partnerStem}相合），${partnerStem} 为日干${selfSourceStem}之合神，五合古法取夫妇之配，主深度亲密关系缘分`,
   );
 
   // ── 生年干符号（财富/事业加看） ──
@@ -429,7 +429,7 @@ export function analyzePersonalSymbols(result: QimenFullResult, birth: BirthInpu
   );
   if (partner) {
     facts.push(
-      `【灵魂伴侣】${partner.note ?? ''}；符号「${partner.displaySymbol}」落${partner.palaceName ?? '?'}（${partner.direction ?? '?'}，第${partner.palace ?? '?'}宫，${partner.onPlate}）【状态：${statesText(partner.states)}】${partner.states.jiXingDetail ? `（${partner.states.jiXingDetail}）` : ''}${partner.states.ruMuDetail ? `（${partner.states.ruMuDetail}）` : ''}${partner.states.kongWangDetail ? `（${partner.states.kongWangDetail}）` : ''}`,
+      `【日干合神】${partner.note ?? ''}；符号「${partner.displaySymbol}」落${partner.palaceName ?? '?'}（${partner.direction ?? '?'}，第${partner.palace ?? '?'}宫，${partner.onPlate}）【状态：${statesText(partner.states)}】${partner.states.jiXingDetail ? `（${partner.states.jiXingDetail}）` : ''}${partner.states.ruMuDetail ? `（${partner.states.ruMuDetail}）` : ''}${partner.states.kongWangDetail ? `（${partner.states.kongWangDetail}）` : ''}`,
     );
   }
   const yearStateText = statesText(yearSymbol.states);

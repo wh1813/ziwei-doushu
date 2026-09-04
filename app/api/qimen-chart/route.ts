@@ -42,7 +42,7 @@ async function isRateLimited(request: Request): Promise<boolean> {
  *
  * 请求体：{ solarDate, timeIndex, questionType?, questionGoal?, birthDate?, birthTimeIndex? }
  *   - 起局时间 = 当前时间（起局要素）；birthDate/birthTimeIndex 为可选出生信息，
- *     仅用于排盘后按八字定位「本人/灵魂伴侣/生年干」用神落宫并检测击刑/入墓/空亡。
+ *     仅用于排盘后按八字定位「本人/日干合神/生年干」用神落宫并检测击刑/入墓/空亡。
  * 要素缺失时返回 400 + 具体缺失文案，严禁强排。
  */
 export async function POST(request: Request): Promise<Response> {
