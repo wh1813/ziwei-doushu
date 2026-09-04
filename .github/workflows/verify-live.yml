@@ -132,7 +132,7 @@ jobs:
 
       - name: Smoke test /api/qimen-interpret (SSE)
         run: |
-          code=$(curl -s -o /tmp/interp.txt -w "%{http_code}" --max-time 60 \
+          code=$(curl -s -o /tmp/interp.txt -w "%{http_code}" --max-time 120 \
             -X POST "$BASE_URL/api/qimen-interpret" \
             -H "Content-Type: application/json" \
             -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业","birthDate":"1994-05-21","birthTimeIndex":1}')

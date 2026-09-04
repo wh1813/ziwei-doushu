@@ -46,6 +46,9 @@ function noThinkingPolicy(config: AiConfig): Record<string, unknown> {
 
 /**
  * 单 provider 同步补全（非流式上游 → 包装为伪 SSE）。
+ * 超时双保险：AbortController 之外再用 Promise.race 强制首字节截止——
+ * 部分 runtime/包装层不传播 AbortSignal，实测曾出现 88s 才出首字节导致
+ * 回退链未按 30s 兜底切换；race 保证超时的 provider 必让位给链上下一家。
  */
 export async function streamChatCompletion(
   config: AiConfig,
@@ -54,9 +57,9 @@ export async function streamChatCompletion(
   messages: ChatMessage[],
 ): Promise<ChatCompletionResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  const abortTimer = setTimeout(() => controller.abort(), config.timeoutMs);
 
-  try {
+  const request = (async (): Promise<string> => {
     const upstream = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -86,22 +89,20 @@ export async function streamChatCompletion(
     const result = await upstream.json() as CompletionResponse;
     const rawContent = result.choices?.[0]?.message?.content?.trim();
     if (!rawContent) throw new Error('AI upstream returned an empty response');
-    const content = sanitizePublicOutput(rawContent);
-    if (!content) throw new Error('AI response was removed by output policy');
+    return rawContent;
+  })();
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      start(streamController) {
-        streamController.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ delta: { text: content } })}\n\n`),
-        );
-        streamController.enqueue(encoder.encode('data: [DONE]\n\n'));
-        streamController.close();
-      },
-    });
-
-    return { content, stream, providerId: config.providerId, model: config.model };
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  let rawContent: string;
+  try {
+    rawContent = await Promise.race([
+      request,
+      new Promise<never>((_, reject) => {
+        deadlineTimer = setTimeout(() => reject(new Error('AI upstream timed out')), config.timeoutMs);
+      }),
+    ]);
   } catch (error) {
+    void request.catch(() => {}); // 竞速落败后悬挂请求的后续拒绝不得成为 unhandled rejection
     const message = error instanceof Error && error.name === 'AbortError'
       ? 'AI upstream timed out'
       : error instanceof Error
@@ -110,8 +111,25 @@ export async function streamChatCompletion(
     console.error('AI completion failed', message);
     throw new Error(message);
   } finally {
-    clearTimeout(timeout);
+    if (deadlineTimer) clearTimeout(deadlineTimer);
+    clearTimeout(abortTimer);
   }
+
+  const content = sanitizePublicOutput(rawContent);
+  if (!content) throw new Error('AI response was removed by output policy');
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      streamController.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ delta: { text: content } })}\n\n`),
+      );
+      streamController.enqueue(encoder.encode('data: [DONE]\n\n'));
+      streamController.close();
+    },
+  });
+
+  return { content, stream, providerId: config.providerId, model: config.model };
 }
 
 /**
