@@ -5,18 +5,18 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export const metadata: Metadata = {
-  title: '紫微命盘 · 倪海夏正宗紫微斗数',
-  description: '基于倪海夏正宗紫微斗数体系，AI深度解读您的命盘格局、大限流年、感情事业财富健康全方位解析',
+  title: '私人命理',
+  description: '私人命理：紫微斗数排盘、手相分析、奇门遁甲起局，AI 深度解读感情、事业与财富，给出可操作的调理建议',
   keywords: '紫微斗数, 倪海夏, 倪海厦, 紫微斗数全集, 紫微斗数全书, 骨髓赋, 命盘, 命理, 14主星, 12宫位',
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: '紫微命盘 · 倪海夏正宗紫微斗数',
-    description: '基于倪海夏正宗紫微斗数体系，AI深度解读您的命盘格局、大限流年、感情事业财富健康全方位解析',
+    title: '私人命理',
+    description: '私人命理：紫微斗数排盘、手相分析、奇门遁甲起局，AI 深度解读感情、事业与财富，给出可操作的调理建议',
     url: siteUrl,
-    siteName: '紫微命盘',
+    siteName: '私人命理',
     locale: 'zh_CN',
     type: 'website',
   },
