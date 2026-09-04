@@ -148,12 +148,8 @@ export default function HomePage() {
       </div>
 
       {/* ── 顶部导航 ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 gap-2"
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-end px-4 sm:px-8 py-3 sm:py-4 gap-2"
         style={{ background: c.navBg }}>
-        <div className="text-[11px] sm:text-xs tracking-[0.3em] sm:tracking-[0.4em] font-medium flex-shrink-0"
-          style={{ color: c.goldSolid }}>
-          紫微命盘
-        </div>
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           <ThemeToggle />
           <motion.button
@@ -183,24 +179,13 @@ export default function HomePage() {
       {/* ══ HERO ══ */}
       <section ref={heroRef} className="relative min-h-[86svh] flex flex-col items-center justify-center px-6 z-10 pt-16">
         <motion.div style={{ y: heroY, opacity: heroOpacity, maxWidth: '960px' }} className="text-center w-full mx-auto">
-          {/* 标签行 */}
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="flex items-center justify-center gap-3 mb-8">
-            <div className="h-px w-12" style={{ background: `linear-gradient(to right, transparent, ${c.goldLine})` }} />
-            <span className="text-[11px] tracking-[0.45em]" style={{ color: c.tagText }}>
-              紫微斗数 · 倪海夏体系
-            </span>
-            <div className="h-px w-12" style={{ background: `linear-gradient(to left, transparent, ${c.goldLine})` }} />
-          </motion.div>
-
           {/* 主标题 */}
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}>
             <h1
               className={`grad-text ${theme === 'dark' ? 'grad-text-dark' : 'grad-text-light'} font-bold leading-none mb-6`}
               style={{ fontSize: 'clamp(56px, 10vw, 124px)', letterSpacing: '0.07em' }}>
-              紫微命盘
+              私人命理
             </h1>
           </motion.div>
 
@@ -257,7 +242,7 @@ export default function HomePage() {
         style={{ borderTop: `1px solid ${c.navBorder}` }}>
         <div className="text-center">
           <p className="text-[10px] tracking-wider mb-2" style={{ color: c.footerText }}>
-            紫微命盘 · 基于倪海夏体系与传统手相学 · 仅供娱乐参考
+            私人命理 · 仅供娱乐参考
           </p>
           <p className="text-[10px] tracking-wider" style={{ color: c.footerText, opacity: 0.85 }}>
             <a href="/terms" style={{ textDecoration: 'underline' }}>服务条款</a>
