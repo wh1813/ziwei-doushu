@@ -1,22 +1,11 @@
-import { getQueryLogDatabase, type D1DatabaseLike } from '@/lib/logging/query-log';
+import { getQueryLogDatabase } from '@/lib/logging/query-log';
 import { extractChartSummary, type QimenFullResult } from '@/lib/qimen/engine';
 
-export interface QimenHistoryRow {
-  id: string;
-  created_at: string;
-  solar_date: string;
-  time_index: number;
-  day_ganzhi: string;
-  time_ganzhi: string;
-  ju_label: string;
-  zhifu_desc: string;
-  zhishi_desc: string;
-  question_type: string;
-  question_goal: string;
-  patterns: string;
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * 奇门起局历史：仅后台落库（写入专用）。
+ * 设计决策：网站暂无用户账户体系，历史不在前端展示，也不提供公开查询/删除接口
+ * （公开列表会暴露所有访客的提问内容）。等账户系统上线后，再按用户隔离重开读写。
+ */
 
 /** 从确定性排盘结果提取入库字段（起局要素 + 盘面关键结论 + LLM 上下文骨架） */
 export function buildRecordFromResult(result: QimenFullResult): {
@@ -82,40 +71,3 @@ export async function saveQimenRecord(result: QimenFullResult): Promise<boolean>
     return false;
   }
 }
-
-/** 最近起局记录（时间倒序，不含 chart_summary 大字段）；表未建/查询失败返回 null 由路由降级 */
-export async function listQimenRecords(limit: number): Promise<QimenHistoryRow[] | null> {
-  const db = getQueryLogDatabase();
-  if (!db) return null;
-  try {
-    const rows = await db
-      .prepare(
-        `SELECT id, created_at, solar_date, time_index, day_ganzhi, time_ganzhi,
-          ju_label, zhifu_desc, zhishi_desc, question_type, question_goal, patterns
-         FROM qimen_records
-         ORDER BY created_at DESC
-         LIMIT ?`,
-      )
-      .bind(Math.min(50, Math.max(1, Math.floor(limit))))
-      .all<QimenHistoryRow>();
-    return rows.results || [];
-  } catch (error) {
-    console.error('Qimen history list failed', error instanceof Error ? error.message : 'unknown');
-    return null;
-  }
-}
-
-/** 删除单条历史记录；id 必须为合法 UUID */
-export async function deleteQimenRecord(id: string): Promise<boolean> {
-  const db = getQueryLogDatabase();
-  if (!db || !UUID_RE.test(id)) return false;
-  try {
-    await db.prepare('DELETE FROM qimen_records WHERE id = ?').bind(id).run();
-    return true;
-  } catch (error) {
-    console.error('Qimen history delete failed', error instanceof Error ? error.message : 'unknown');
-    return false;
-  }
-}
-
-export type { D1DatabaseLike };

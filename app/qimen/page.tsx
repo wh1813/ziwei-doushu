@@ -21,29 +21,6 @@ const TIME_OPTIONS = [
 
 const QUESTION_TYPES = ["事业", "求财", "感情", "考试", "健康", "出行", "诉讼", "寻物", "其他"];
 
-function timeIndexLabel(idx: number): string {
-  return TIME_OPTIONS.find((o) => o.value === idx)?.label || `时辰${idx}`;
-}
-
-function parsePatterns(raw: string): Array<{ name: string; nature: string }> {
-  try {
-    const arr = JSON.parse(raw) as Array<{ name: string; nature: string }>;
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-function formatHistoryTime(raw: string): string {
-  // D1 CURRENT_TIMESTAMP 为 UTC："YYYY-MM-DD HH:MM:SS" → 北京时间展示
-  const m = raw.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
-  if (!m) return raw;
-  const d = new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4]}Z`);
-  if (Number.isNaN(d.getTime())) return raw;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 // 洛书九宫展示顺序（左上4起，按行读：4-9-2 / 3-5-7 / 8-1-6）
 const GRID_ORDER = [4, 9, 2, 3, 5, 7, 8, 1, 6];
 
@@ -158,21 +135,6 @@ interface ChartUnfavorablePayload {
   ruMu: ChartUnfavorableItemPayload[];
 }
 
-interface QimenHistoryItem {
-  id: string;
-  created_at: string;
-  solar_date: string;
-  time_index: number;
-  day_ganzhi: string;
-  time_ganzhi: string;
-  ju_label: string;
-  zhifu_desc: string;
-  zhishi_desc: string;
-  question_type: string;
-  question_goal: string;
-  patterns: string;
-}
-
 export default function QimenPage() {
   const [solarDate, setSolarDate] = useState("");
   const [timeIndex, setTimeIndex] = useState<number>(6);
@@ -185,9 +147,6 @@ export default function QimenPage() {
   const [interpretLoading, setInterpretLoading] = useState(false);
   const [answer, setAnswer] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [history, setHistory] = useState<QimenHistoryItem[]>([]);
-  const [historyAvailable, setHistoryAvailable] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(false);
 
   // 出生信息可选：填了日期才随请求提交（起局时间始终为上方当前时间）
   const birthPayload = birthDate
@@ -227,53 +186,6 @@ export default function QimenPage() {
     }
   }, [birthDate, birthTimeIndex]);
 
-  const fetchHistory = async () => {
-    setHistoryLoading(true);
-    try {
-      const res = await fetch("/api/qimen-history?limit=20");
-      if (!res.ok) {
-        setHistoryAvailable(false);
-        return;
-      }
-      const j = (await res.json()) as { available?: boolean; records?: QimenHistoryItem[] };
-      setHistoryAvailable(j.available !== false);
-      setHistory(j.records || []);
-    } catch {
-      setHistoryAvailable(false);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  // 进入页面即拉取起局历史
-  useEffect(() => {
-    void fetchHistory();
-  }, []);
-
-  const deleteHistoryItem = async (id: string) => {
-    setHistory((prev) => prev.filter((h) => h.id !== id));
-    try {
-      await fetch("/api/qimen-history", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-    } catch {
-      // 本地已移除，服务端失败静默
-    }
-  };
-
-  const reopenFromHistory = (item: QimenHistoryItem) => {
-    const qt = item.question_type || "事业";
-    const qg = item.question_goal || "";
-    setSolarDate(item.solar_date);
-    setTimeIndex(item.time_index);
-    setQuestionType(qt);
-    setQuestionGoal(qg);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    void handleCastChart({ solarDate: item.solar_date, timeIndex: item.time_index, questionType: qt, questionGoal: qg });
-  };
-
   const handleCastChart = async (overrides?: {
     solarDate?: string;
     timeIndex?: number;
@@ -310,8 +222,6 @@ export default function QimenPage() {
         throw new Error(j.error || "排盘失败，请稍后重试");
       }
       setChartData((await res.json()) as QimenChartPayload);
-      // 排盘成功后刷新起局历史（best-effort）
-      void fetchHistory();
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "请求服务器失败，请检查网络连接");
     } finally {
@@ -741,88 +651,6 @@ export default function QimenPage() {
             <div className="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">
               {answer}
               {interpretLoading && <span className="inline-block w-2 h-4 ml-1 bg-amber-400 animate-pulse align-middle" />}
-            </div>
-          </div>
-        )}
-
-        {/* 起局历史（D1 可用时展示） */}
-        {historyAvailable && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
-                <span>🗂️</span> 起局历史（最近 20 局）
-              </h2>
-              <button
-                type="button"
-                onClick={() => void fetchHistory()}
-                className="text-xs text-slate-400 hover:text-emerald-400 transition-colors"
-              >
-                {historyLoading ? "刷新中…" : "↻ 刷新"}
-              </button>
-            </div>
-            {history.length === 0 && !historyLoading && (
-              <p className="text-sm text-slate-500">暂无历史记录——完成一次排盘后自动留存。</p>
-            )}
-            <div className="space-y-2">
-              {history.map((item) => {
-                const patterns = parsePatterns(item.patterns);
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="text-slate-400 text-xs">{formatHistoryTime(item.created_at)}</span>
-                        <span className="font-medium text-emerald-300">
-                          {item.solar_date} · {timeIndexLabel(item.time_index)}
-                        </span>
-                        <span className="text-amber-300">{item.ju_label}</span>
-                        {item.question_type && (
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs">
-                            {item.question_type}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1 truncate">
-                        {item.day_ganzhi && item.time_ganzhi ? `日${item.day_ganzhi} 时${item.time_ganzhi} · ` : ""}
-                        值符{item.zhifu_desc} · 值使{item.zhishi_desc}
-                        {item.question_goal ? ` · ${item.question_goal.slice(0, 60)}` : ""}
-                      </div>
-                      {patterns.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {patterns.map((p, i) => (
-                            <span
-                              key={i}
-                              className={`px-1.5 py-0.5 rounded text-[10px] ${
-                                p.nature === "吉" ? "bg-emerald-900/60 text-emerald-300" : "bg-rose-900/60 text-rose-300"
-                              }`}
-                            >
-                              {p.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => reopenFromHistory(item)}
-                        className="px-3 py-1.5 text-xs rounded-lg border border-emerald-600 text-emerald-400 hover:bg-emerald-600 hover:text-slate-950 transition-all"
-                      >
-                        重开此局
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void deleteHistoryItem(item.id)}
-                        className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-700 text-slate-500 hover:border-rose-600 hover:text-rose-400 transition-all"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         )}
