@@ -13,6 +13,7 @@ import {
   analyzePersonalSymbols,
   detectChartUnfavorable,
 } from '@/lib/qimen/remedy';
+import { updateQimenRecordInterpret } from '@/lib/qimen/history';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -81,8 +82,10 @@ async function isRateLimited(request: Request): Promise<boolean> {
  *   前端提交起局要素 → 服务端确定性排盘（与 /api/qimen-chart 同一引擎） → 用神与格局规则匹配
  *   → 防幻觉 Prompt → 复用 streamChatCompletion（DeepSeek，服务端密钥）→ SSE 输出
  *
- * 请求体：{ solarDate, timeIndex, questionType?, questionGoal?, birthDate?, birthTimeIndex? }
+ * 请求体：{ solarDate, timeIndex, questionType?, questionGoal?, birthDate?, birthTimeIndex?, recordId? }
  *   - 起局时间 = 当前时间；可选出生信息仅用于预计算个人用神落宫（LLM 只引用、严禁重算）。
+ *   - 可选 recordId = /api/qimen-chart 返回的起局记录 id：解盘成功后 best-effort 回填
+ *     interpret_text 至该 D1 记录（后台起局历史含解盘内容）；非法或缺失时跳过，不影响解盘。
  * 要素缺失时返回 400 + 具体缺失文案（NEED_CLARIFICATION 语义），严禁强排。
  */
 export async function POST(request: Request): Promise<Response> {
@@ -103,12 +106,15 @@ export async function POST(request: Request): Promise<Response> {
   }
   if (!body || typeof body !== 'object') return errorResponse('请求格式无效', 400);
 
-  const { solarDate, timeIndex, questionType, questionGoal } = body as {
+  const { solarDate, timeIndex, questionType, questionGoal, recordId } = body as {
     solarDate?: unknown;
     timeIndex?: unknown;
     questionType?: unknown;
     questionGoal?: unknown;
+    recordId?: unknown;
   };
+  // 回填目标记录 id：仅接受合法 UUID，其余（缺失/非法）一律置空跳过，绝不因此阻塞解盘
+  const interpretRecordId = typeof recordId === 'string' && recordId.trim() ? recordId.trim() : null;
 
   // ── 第一步：要素校验（缺要素严禁强排）──
   const validationError = validateQimenInput({ solarDate, timeIndex });
@@ -190,6 +196,10 @@ export async function POST(request: Request): Promise<Response> {
       durationMs: Date.now() - startedAt,
       country,
     });
+    // 起局历史回填解盘内容（best-effort：recordId 缺失/非法或迁移 0004 未应用时静默跳过）
+    if (interpretRecordId) {
+      await updateQimenRecordInterpret(interpretRecordId, cleaned);
+    }
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {

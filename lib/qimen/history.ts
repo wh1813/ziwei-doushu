@@ -37,12 +37,13 @@ export function buildRecordFromResult(result: QimenFullResult): {
   };
 }
 
-/** best-effort 落库：D1 不可用或表未建时静默跳过（返回 false），绝不影响排盘主流程 */
-export async function saveQimenRecord(result: QimenFullResult): Promise<boolean> {
+/** best-effort 落库：D1 不可用或表未建时静默跳过（返回 null），绝不影响排盘主流程；成功返回新记录 id */
+export async function saveQimenRecord(result: QimenFullResult): Promise<string | null> {
   const db = getQueryLogDatabase();
-  if (!db) return false;
+  if (!db) return null;
   try {
     const r = buildRecordFromResult(result);
+    const recordId = crypto.randomUUID();
     await db
       .prepare(
         `INSERT INTO qimen_records (
@@ -51,7 +52,7 @@ export async function saveQimenRecord(result: QimenFullResult): Promise<boolean>
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
-        crypto.randomUUID(),
+        recordId,
         r.solarDate,
         r.timeIndex,
         r.dayGanZhi,
@@ -65,9 +66,32 @@ export async function saveQimenRecord(result: QimenFullResult): Promise<boolean>
         r.chartSummary,
       )
       .run();
-    return true;
+    return recordId;
   } catch (error) {
     console.error('Qimen history save failed', error instanceof Error ? error.message : 'unknown');
+    return null;
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 回填解盘内容到对应起局记录（best-effort）：
+ * D1 不可用、记录不存在或迁移 0004 未应用（无 interpret_text 列）时静默失败（返回 false），
+ * 绝不影响解盘主流程（AI 查询日志已另行存有解盘全文）。
+ */
+export async function updateQimenRecordInterpret(recordId: string, interpretText: string): Promise<boolean> {
+  if (!UUID_RE.test(recordId)) return false;
+  const db = getQueryLogDatabase();
+  if (!db) return false;
+  try {
+    await db
+      .prepare('UPDATE qimen_records SET interpret_text = ?, interpreted_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .bind(interpretText.slice(0, 50000), recordId)
+      .run();
+    return true;
+  } catch (error) {
+    console.error('Qimen history interpret update failed', error instanceof Error ? error.message : 'unknown');
     return false;
   }
 }

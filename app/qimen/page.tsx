@@ -79,6 +79,7 @@ interface QimenChartPayload {
   };
   personal: PersonalAnalysisPayload | null;
   chartUnfavorable: ChartUnfavorablePayload | null;
+  recordId?: string | null;
 }
 
 // ── 个人用神定位 / 全盘不利状态（附加检测层，接口见 lib/qimen/remedy.ts）──
@@ -245,6 +246,7 @@ export default function QimenPage() {
           questionType: questionType,
           questionGoal: questionGoal.trim() || undefined,
           ...birthPayload,
+          recordId: chartData.recordId || undefined,
         }),
       });
       if (!res.ok) {

@@ -43,6 +43,7 @@ async function isRateLimited(request: Request): Promise<boolean> {
  * 请求体：{ solarDate, timeIndex, questionType?, questionGoal?, birthDate?, birthTimeIndex? }
  *   - 起局时间 = 当前时间（起局要素）；birthDate/birthTimeIndex 为可选出生信息，
  *     仅用于排盘后按八字定位「本人/日干合神/生年干」用神落宫并检测击刑/入墓/空亡。
+ *   - 响应附 record_id（best-effort 落库成功时）：解盘请求回传该 id，解盘内容将回填至该起局记录。
  * 要素缺失时返回 400 + 具体缺失文案，严禁强排。
  */
 export async function POST(request: Request): Promise<Response> {
@@ -94,9 +95,10 @@ export async function POST(request: Request): Promise<Response> {
     const chartUnfavorable = detectChartUnfavorable(result.chart);
     const personal = birthParse.birth ? analyzePersonalSymbols(result, birthParse.birth) : null;
     // ── 第四步：起局历史落库（best-effort：D1 不可用/表未建时静默跳过，不影响排盘）──
-    await saveQimenRecord(result);
+    // 返回 record_id：前端解盘时回传，/api/qimen-interpret 成功后据此回填 interpret_text
+    const recordId = await saveQimenRecord(result);
     return Response.json(
-      { ...result, personal, chartUnfavorable },
+      { ...result, personal, chartUnfavorable, recordId },
       {
         headers: { 'Cache-Control': 'no-store' },
       },
