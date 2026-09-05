@@ -65,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
 
   // ── 第一步：要素校验（缺要素严禁强排）──
   const validation = validateDaliurenInput({ solarDate, timeIndex });
-  if (!validation.ok) return errorResponse(validation.error || '起课要素不合法', 400);
+  if (!validation.ok) return errorResponse(typeof validation.error === 'string' ? validation.error : '起课要素不合法', 400);
 
   const normalizedType = typeof questionType === 'string' ? questionType.trim().slice(0, 20) : '';
   const normalizedGoal = typeof questionGoal === 'string' ? questionGoal.trim().slice(0, 500) : '';
