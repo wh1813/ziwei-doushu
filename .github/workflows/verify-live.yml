@@ -42,6 +42,10 @@ jobs:
           python3 - <<'PY'
           import urllib.request, re, sys
           BASE = 'https://symgxm.hulu.kdns.fr'
+          UA = {'User-Agent': 'workbuddy-verify/1.0 (+https://github.com/wh1813/ziwei-doushu)'}
+          def fetch(path):
+              req = urllib.request.Request(BASE + path, headers=UA)
+              return urllib.request.urlopen(req, timeout=30).read().decode('utf-8', errors='replace')
           spec = [
               ('/qimen',     'qimen',     ['data-banner="qimen"',     '帝王之学',  '洛书九宫']),
               ('/liuyao',    'liuyao',    ['data-banner="liuyao"',    '周易古占',  '铜钱摇卦']),
@@ -50,7 +54,7 @@ jobs:
           ]
           fails = 0
           for path, key, must in spec:
-              html = urllib.request.urlopen(BASE + path, timeout=30).read().decode('utf-8', errors='replace')
+              html = fetch(path)
               missing = [m for m in must if m not in html]
               status = 'OK  ' if not missing else 'FAIL'
               print(f'{status} {path:14s} size={len(html):6d}  missing={missing}')
@@ -73,7 +77,7 @@ jobs:
           cache = {}
           for path, marker, expect in exclusivity:
               if path not in cache:
-                  cache[path] = urllib.request.urlopen(BASE + path, timeout=30).read().decode('utf-8', errors='replace')
+                  cache[path] = fetch(path)
               html = cache[path]
               present = marker in html
               ok = (present == expect)
@@ -84,7 +88,7 @@ jobs:
                   print(f'{status} {path:14s} should MISS    {marker}  present={present}')
               if not ok: fails += 1
           # 首页 sigil tagline 必须出现在 6 张卡片里
-          home = urllib.request.urlopen(BASE + '/', timeout=30).read().decode('utf-8', errors='replace')
+          home = fetch('/')
           sigils = ['命宫十四主', '三才纹', '洛书九宫', '京房纳甲', '月将加时', '大安起月']
           miss_sigil = [s for s in sigils if s not in home]
           print(('OK  ' if not miss_sigil else 'FAIL') + f' HOMEPAGE sigil tagline  missing={miss_sigil}')
