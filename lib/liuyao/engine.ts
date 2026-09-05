@@ -193,11 +193,12 @@ function yaosFromTime(solar: Solar): { yaos: boolean[]; dongIndices: number[] } 
   // 上卦数 = (年+月+日) % 8（0 视为 8）
   // 下卦数 = (年+月+日+时) % 8
   // 动爻数 = (年+月+日+时) % 6（0 视为 6）
+  // 注意：Lunar d.ts 中无 getTimeZhi()，从 getTimeInGanZhi() 末位取地支
   const ba = solar.getLunar();
   const yearZhiIdx = getZhiIndex(ba.getYearZhi());
   const monthZhiIdx = getZhiIndex(ba.getMonthZhi());
   const dayZhiIdx = getZhiIndex(ba.getDayZhi());
-  const timeZhiIdx = getZhiIndex(ba.getTimeZhi());
+  const timeZhiIdx = getZhiIndex(ba.getTimeInGanZhi().slice(-1));
 
   const upperNum = (yearZhiIdx + monthZhiIdx + dayZhiIdx) % 8 || 8;
   const lowerNum = (yearZhiIdx + monthZhiIdx + dayZhiIdx + timeZhiIdx) % 8 || 8;
@@ -446,9 +447,9 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
   );
   const lunar = solar.getLunar();
   const ganzhi = {
-    year: lunar.getYearInGanZhi(),
-    month: lunar.getMonthInGanZhi(),
-    day: lunar.getDayInGanZhi(),
+    year: lunar.getYearInGanZhiExact(),
+    month: lunar.getMonthInGanZhiExact(),
+    day: lunar.getDayInGanZhiExact(),
     time: lunar.getTimeInGanZhi(),
   };
 
