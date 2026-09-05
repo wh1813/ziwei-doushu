@@ -127,6 +127,14 @@ const ENTRIES = [
     icon: '☵',
     accent: 'indigo',
   },
+  {
+    key: 'xiaoliuren',
+    title: '小六壬掌诀',
+    desc: '诸葛马前课，仅用月日时三步掌诀顺数，掐指一算当即立断。',
+    cta: '掐指起课',
+    icon: '☷',
+    accent: 'cyan',
+  },
 ];
 
 // ─── 主页（精简版：排盘 + 手相 + 奇门）─────────────────────
@@ -203,6 +211,13 @@ export default function HomePage() {
             style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
             大六壬
           </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => router.push('/xiaoliuren')}
+            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
+            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
+            小六壬
+          </motion.button>
         </div>
       </nav>
 
@@ -223,7 +238,7 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.45 }}
             className="text-sm max-w-xl mx-auto leading-relaxed mb-12"
             style={{ color: c.textMuted }}>
-            紫微排盘 · 手相分析 · 奇门遁甲 · 六爻起卦 · 大六壬起课 — 简易操作，即刻解读
+            紫微排盘 · 手相分析 · 奇门遁甲 · 六爻起卦 · 大六壬起课 · 小六壬掌诀 — 简易操作，即刻解读
           </motion.p>
 
           {/* 三大功能入口 */}
@@ -238,14 +253,18 @@ export default function HomePage() {
                   ? '#14b8a6'
                   : e.accent === 'indigo'
                     ? '#6366f1'
-                    : isGold ? c.goldSolid : '#3a78d4';
+                    : e.accent === 'cyan'
+                      ? '#06b6d4'
+                      : isGold ? c.goldSolid : '#3a78d4';
               const accentBorder = e.accent === 'purple'
                 ? 'rgba(168,85,247,0.35)'
                 : e.accent === 'teal'
                   ? 'rgba(20,184,166,0.35)'
                   : e.accent === 'indigo'
                     ? 'rgba(99,102,241,0.35)'
-                    : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
+                    : e.accent === 'cyan'
+                      ? 'rgba(6,182,212,0.35)'
+                      : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
               return (
                 <motion.button
                   key={e.key}
