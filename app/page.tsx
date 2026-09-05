@@ -98,15 +98,6 @@ const ENTRIES = [
     icon: '☷',
     accent: 'cyan',
   },
-  {
-    key: 'fortune',
-    title: '运势中心',
-    desc: '把已起好的 1-4 个术数盘面粘贴进来，跨模块交叉印证，按本月/本季/本年与聚焦维度给综合报告。',
-    sigil: '跨盘印证 · 五段结构',
-    cta: '进入运势中心',
-    icon: '✧',
-    accent: 'fuchsia',
-  },
 ];
 
 // ─── 主页（精简版：排盘 + 手相 + 奇门）─────────────────────
@@ -177,9 +168,7 @@ export default function HomePage() {
                     ? '#6366f1'
                     : e.accent === 'cyan'
                       ? '#06b6d4'
-                      : e.accent === 'fuchsia'
-                        ? '#d946ef'
-                        : isGold ? c.goldSolid : '#3a78d4';
+                      : isGold ? c.goldSolid : '#3a78d4';
               const accentBorder = e.accent === 'purple'
                 ? 'rgba(168,85,247,0.35)'
                 : e.accent === 'teal'
@@ -188,9 +177,7 @@ export default function HomePage() {
                     ? 'rgba(99,102,241,0.35)'
                     : e.accent === 'cyan'
                       ? 'rgba(6,182,212,0.35)'
-                      : e.accent === 'fuchsia'
-                        ? 'rgba(217,70,239,0.35)'
-                        : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
+                      : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
               return (
                 <motion.button
                   key={e.key}

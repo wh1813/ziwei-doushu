@@ -18,7 +18,6 @@ export type DivinationModule =
   | 'daliuren'   // 大六壬
   | 'xiaoliuren' // 小六壬
   | 'meihua'     // 梅花易数
-  | 'fortune'    // 运势中心（聚合报告，不起新盘）
   | 'relationship'; // 关系合盘（双人/多人合局）
 
 /** 排盘接口统一形态（具体模块自行实现） */
