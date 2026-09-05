@@ -322,7 +322,7 @@ const SHEN_START: Record<string, number> = {
   丑: 3, 未: 3,                  // 初爻起螣蛇
 };
 
-function liushouByDay(dayZhi: string): Liuqin[] {
+function liushouByDay(dayZhi: string): Liushou[] {
   // 返回 6 个爻（自下而上 1-6）的六兽
   const startIdx = SHEN_START[dayZhi] ?? 0;
   const arr: Liushou[] = [];
@@ -519,7 +519,7 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
     const ben = benNaiJiaForYao(pos);
     const zhiWuxing = DIZHI_WUXING[ben.zhi] || '土';
     const liuqin = computeLiuqin(guaGongWuxing, zhiWuxing);
-    const liushou = liushouList[pos - 1] as Liushou;
+    const liushou = liushouList[pos - 1];
     const yao: LiuyaoYao = {
       position: pos,
       yinYang: yinyang,
