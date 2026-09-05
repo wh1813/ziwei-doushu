@@ -600,14 +600,15 @@ jobs:
                   print(f'OK   /fortune size={len(html)}  all keywords present')
 
           # 2) 首页必须含运势中心入口 + TopNav 7 项
+          # 注意：卡片是 <button> 用 router.push，无 href 字面量；探针只查关键文本
           home = fetch('/')
-          must_home = ['运势中心', '跨盘印证', '/fortune']
+          must_home = ['运势中心', '跨盘印证']
           miss_home = [m for m in must_home if m not in home]
           if miss_home:
               print(f'FAIL / homepage missing fortune entry: {miss_home}')
               fails += 1
           else:
-              print('OK   / homepage has fortune center entry card')
+              print('OK   / homepage has fortune center entry card (button + sigil)')
 
           # 3) TopNav 7 模块项都应出现在所有 6 个真实页面（/chart 是 404 路由不查）
           pages = ['/', '/palm', '/qimen', '/liuyao', '/daliuren', '/xiaoliuren', '/fortune']
