@@ -199,6 +199,11 @@ function isYinZhi(z: string): boolean {
   return YIN_ZHI.has(z);
 }
 
+/** 地支阳 */
+function isYangZhi(z: string): boolean {
+  return YANG_ZHI.has(z);
+}
+
 /** 天干阴阳 */
 function isYinGan(g: string): boolean {
   return YIN_GAN.has(g);
