@@ -658,20 +658,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}' \
             -o /tmp/qimen_chart.json
-          # 用 Python 包装成 fortune-report 期望的 payload（避免 YAML/bash 嵌套）
-          python3 - /tmp/qimen_chart.json > /tmp/fortune_payload.json <<'PYEOF'
-import json, sys
-with open(sys.argv[1], 'r', encoding='utf-8') as f:
-    chart = json.load(f)
-payload = {
-  'charts': [{'module': 'qimen', 'json': chart}],
-  'period': 'month',
-  'focus': 'overall',
-  'birthDate': None,
-  'birthTimeIndex': None,
-}
-print(json.dumps(payload, ensure_ascii=False))
-PYEOF
+          # 用 Python 包装成 fortune-report 期望的 payload（从 stdin 读 qimen JSON）
+          python3 -c "import json,sys; c=json.load(sys.stdin); print(json.dumps({'charts':[{'module':'qimen','json':c}],'period':'month','focus':'overall','birthDate':None,'birthTimeIndex':None}, ensure_ascii=False))" \
+            < /tmp/qimen_chart.json > /tmp/fortune_payload.json
           code=$(curl -s -o /tmp/fortune_sse.txt -w "%{http_code}" --max-time 180 \
             -X POST "$BASE_URL/api/fortune-report" \
             -H "Content-Type: application/json" \
