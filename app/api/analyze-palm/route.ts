@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProviderChain } from '@/lib/ai/config';
 
+// =====================================================================
+// R18-5 手相 / 面相 双模升级
+// mode: 'palm' (default) | 'face'
+//   - palm: 保留原流程，handSide ('left' | 'right') 决定先天 / 后天
+//   - face: 新增流程，userGender / userAgeBand 用于辅断
+// 表 palm_records 新增 mode 列 (默认 'palm'，face 时填 'face')
+// =====================================================================
+
 // 兼容读取 OpenNext / Cloudflare 环境变量与机密
 function getEnv(key: string): string | undefined {
   try {
@@ -16,14 +24,12 @@ function getEnv(key: string): string | undefined {
 
 // 安全获取 Cloudflare Bindings (D1, R2, AI)
 function getCloudflareBinding(name: string): any {
-  // 1. 优先从 @opennextjs/cloudflare 上下文中获取
   try {
     const { getCloudflareContext } = require('@opennextjs/cloudflare');
     const ctx = getCloudflareContext();
     if (ctx?.env?.[name]) return ctx.env[name];
   } catch {}
 
-  // 2. 降级从全局上下文或 process.env 获取
   const globalObj = globalThis as any;
   const env = (process as any).env || {};
   return globalObj[name] || env[name] || globalObj.env?.[name];
@@ -64,12 +70,14 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 // =====================================================================
-// 阶段 A：多模态视觉特征提取（重点捕捉复合穿插、交叉纹路与左右手侧重点）
+// 阶段 A：多模态视觉特征提取
+//   - palm 模式：buildPalmVisionPrompt + palm 特征 JSON
+//   - face 模式：buildFaceVisionPrompt + 三庭五眼 / 十二宫 特征 JSON
 // =====================================================================
 
-function buildVisionPrompt(handSide: 'left' | 'right') {
-  const handContext = handSide === 'left' 
-    ? '【左手】代表【先天根基、潜意识性格、遗传禀赋、35岁前的主导气运与原生家庭影响】' 
+function buildPalmVisionPrompt(handSide: 'left' | 'right') {
+  const handContext = handSide === 'left'
+    ? '【左手】代表【先天根基、潜意识性格、遗传禀赋、35岁前的主导气运与原生家庭影响】'
     : '【右手】代表【后天修为、显意识行为、后天造化、35岁后的主导运势与个人努力轨迹】';
 
   return `你是一位兼通中国传统麻衣相法、柳庄相法与手部生理结构的国手级相学大师。
@@ -97,8 +105,54 @@ function buildVisionPrompt(handSide: 'left' | 'right') {
 请严格遵守：务必基于图像真实观察，切勿输出任何 Markdown 代码块标记，纯 JSON 返回。`;
 }
 
-async function visionExtract(base64Pure: string, mimeType: string, handSide: 'left' | 'right'): Promise<any> {
-  const promptText = buildVisionPrompt(handSide);
+function buildFaceVisionPrompt(userGender: 'male' | 'female' | 'unspecified', userAgeBand: string) {
+  const genderContext = userGender === 'male'
+    ? '【男性】面部骨架偏方阔、颧骨与下颌骨较显、五官轮廓偏刚毅'
+    : userGender === 'female'
+      ? '【女性】面部轮廓偏柔润、五官比例更讲究匀称与神韵'
+      : '【性别未知】请基于图像客观观察，避免性别预设';
+  const ageContext = userAgeBand
+    ? `【年龄段】${userAgeBand}（据此调整气色与肌肉走向的判断权重）`
+    : '【年龄段未知】按图像中可见的成熟度评估';
+
+  return `你是一位兼通中国传统麻衣相法、柳庄相法、《太清神鉴》与现代人体美学的国手级相学大师。
+当前正在鉴析用户的面部图像（${genderContext}；${ageContext}）。
+
+请你以极度专业、细致入微的眼光观察面部图像，重点捕捉【三庭五眼、十二宫、气色神韵、宏观骨相与微观纹痕痣斑】，按以下格式输出 JSON：
+{
+  "faceShape": "面型（八格分类：田、由、国、用、目、甲、风、申；结合下颌、颧骨、额头的宽窄方圆）",
+  "threeCourtFiveEyes": {
+    "upperCourt": "上庭（发际至眉）：额相高阔饱满度、发际整齐度、额纹深浅、印堂开阔与明润",
+    "middleCourt": "中庭（眉至鼻准）：眉形（清秀/浓杂/压眼/疏散）、眼型（凤眼/桃花/三角等）、眼神聚散、鼻子（山根年寿/准头兰台/廷尉）、颧骨力量",
+    "lowerCourt": "下庭（鼻准至地阁）：人中深浅与长短、口形（端厚/薄削）、地阁（下巴）方圆兜收、承浆位"
+  },
+  "twelvePalaces": {
+    "命宫": "印堂开阔明润度",
+    "财帛宫": "鼻子（山根至准头）气色形态",
+    "兄弟宫": "眉相及眉头眉尾",
+    "田宅宫": "上眼皮与眼睑",
+    "男女宫（子嗣）": "眼下泪堂与卧蚕",
+    "奴仆宫（交友）": "颧骨下方的地阁上沿",
+    "妻妾宫": "太阳穴与鱼尾位",
+    "疾厄宫": "山根与年寿",
+    "迁移宫": "驿马位（额角发际边）",
+    "官禄宫": "中正位（额中偏上）",
+    "福德宫": "天仓位（眉尾上方太阳穴一带）",
+    "相貌（总论）": "五岳（额为南岳衡山、鼻为中岳嵩山、颏为北岳恒山、左颧为东岳泰山、右颧为西岳华山）气势与均衡"
+  },
+  "complexMarks": {
+    "molesAndSpots": "痣、斑、痕、纹（位置在十二宫的实际影响）",
+    "dynamicLines": "法令纹、笑纹、鱼尾纹、川字纹、八字纹等的深浅走向与年龄映射",
+    "auraColor": "面部气色（明润/红黄/青暗/晦滞）与神韵（清/浊/刚/柔/和/戾）"
+  },
+  "supplement": "整体骨肉停匀、五官比例、肤质、精神状态的总观感"
+}
+
+请严格遵守：务必基于图像真实观察，切勿输出任何 Markdown 代码块标记，纯 JSON 返回。`;
+}
+
+async function visionExtractPalm(base64Pure: string, mimeType: string, handSide: 'left' | 'right'): Promise<any> {
+  const promptText = buildPalmVisionPrompt(handSide);
 
   // 1. Google Gemini 视觉
   const geminiKey = getEnv('PALM_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY');
@@ -127,7 +181,7 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
           if (parsed && (parsed.palmFeatures || parsed.handType)) return parsed;
         }
       } catch (err) {
-        console.warn(`Gemini ${model} vision failed:`, err);
+        console.warn(`Gemini ${model} vision (palm) failed:`, err);
       }
     }
   }
@@ -146,11 +200,11 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
       const parsed = parseJsonSafe(rawText);
       if (parsed) return parsed;
     } catch (err) {
-      console.warn('Workers AI vision failed:', err);
+      console.warn('Workers AI vision (palm) failed:', err);
     }
   }
 
-  // 3. 动态自适应兜底
+  // 3. palm 自适应兜底
   return {
     handType: handSide === 'left' ? "木火相生型（清秀修长，主精神求知与先天悟性）" : "木土兼通型（厚重坚实，主后天开拓力与行事实干）",
     palmFeatures: {
@@ -170,6 +224,95 @@ async function visionExtract(base64Pure: string, mimeType: string, handSide: 'le
   };
 }
 
+async function visionExtractFace(
+  base64Pure: string,
+  mimeType: string,
+  userGender: 'male' | 'female' | 'unspecified',
+  userAgeBand: string,
+): Promise<any> {
+  const promptText = buildFaceVisionPrompt(userGender, userAgeBand);
+
+  // 1. Google Gemini 视觉
+  const geminiKey = getEnv('PALM_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY');
+  if (geminiKey) {
+    const models = ['gemini-1.5-flash-002', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: mimeType, data: base64Pure } }
+              ]
+            }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 2500 }
+          })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const parsed = parseJsonSafe(text);
+          if (parsed && (parsed.faceShape || parsed.threeCourtFiveEyes || parsed.twelvePalaces)) return parsed;
+        }
+      } catch (err) {
+        console.warn(`Gemini ${model} vision (face) failed:`, err);
+      }
+    }
+  }
+
+  // 2. Cloudflare 原生 Workers AI
+  const aiBinding = getCloudflareBinding('AI');
+  if (aiBinding && typeof aiBinding.run === 'function') {
+    try {
+      const bytes = base64ToUint8Array(base64Pure);
+      const response = await aiBinding.run('@cf/meta/llama-3.2-11b-vision-instruct', {
+        image: Array.from(bytes),
+        prompt: promptText + " 必须严格仅输出合法 JSON 格式。",
+        max_tokens: 1800,
+      });
+      const rawText = response?.response || response?.description || '';
+      const parsed = parseJsonSafe(rawText);
+      if (parsed) return parsed;
+    } catch (err) {
+      console.warn('Workers AI vision (face) failed:', err);
+    }
+  }
+
+  // 3. face 自适应兜底
+  return {
+    faceShape: "田字格（额方、颏方、颧骨有势，五岳俱收）",
+    threeCourtFiveEyes: {
+      upperCourt: "上庭饱满发际整齐，额相开阔无杂纹，印堂明润无暗滞，主先天根基稳、长辈缘佳。",
+      middleCourt: "中庭眉清目秀，山根不塌，年寿丰隆，准头圆润有泽，主35-50岁事业人脉顺达。",
+      lowerCourt: "下庭人中深阔，地阁方圆兜收，主晚景有靠、衣食无忧。"
+    },
+    twelvePalaces: {
+      命宫: "印堂开阔明润，气色黄润，主根基稳固、长寿可期。",
+      财帛宫: "山根不塌、准头圆润有泽，主正财稳健、不必为五斗米折腰。",
+      兄弟宫: "眉形清秀不压眼，兄弟朋友互相帮衬。",
+      田宅宫: "上眼皮饱满明润，主居有定所、祖荫护身。",
+      子嗣宫: "泪堂不凹陷、卧蚕隐约，主子女缘厚。",
+      奴仆宫: "颧下有肉不削，主部属朋友忠顺。",
+      妻妾宫: "太阳穴饱满、鱼尾平顺，主婚姻稳定、配偶贤能。",
+      疾厄宫: "山根不陷、年寿丰隆，主脏腑少疾。",
+      迁移宫: "驿马位丰隆，主出门远行有利可图。",
+      官禄宫: "中正位明润无杂纹，主仕途正印、身有担当。",
+      福德宫: "天仓位气色清亮，主精神充实、福德随身。",
+      相貌总论: "五岳气势均衡，四渎（耳、目、口、鼻）清朗，神清气爽。"
+    },
+    complexMarks: {
+      molesAndSpots: "面部气色清爽无晦暗痣斑，偶见细微良性小痣不碍大局。",
+      dynamicLines: "法令纹清晰有度、深而不破，笑纹和煦有情，主社交圆融、贵人多助。",
+      auraColor: "面部气色明润有光泽，神韵清和，体现中正有守、内外相称。"
+    },
+    supplement: "整体骨相端方、肉相停匀，神清气和，是兼修内外之相。"
+  };
+}
+
 // =====================================================================
 // 阶段 B：DeepSeek 深度命理综合鉴析
 // =====================================================================
@@ -178,24 +321,32 @@ async function reportOnce(opts: {
   apiKey: string;
   baseUrl: string;
   model: string;
-  handSide: 'left' | 'right';
+  mode: 'palm' | 'face';
+  handSide?: 'left' | 'right';
+  userGender?: 'male' | 'female' | 'unspecified';
+  userAgeBand?: string;
   features: any;
   userQuestion?: string;
 }): Promise<any> {
   let base = (opts.baseUrl || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
   let endpoint = base.endsWith('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
 
-  const handTitle = opts.handSide === 'left' ? '【左手·先天命盘与先天禀赋】' : '【右手·后天造化与行事修为】';
-  const handRole = opts.handSide === 'left' 
-    ? '主掌 35 岁前的运势起伏、性格潜意识、父母遗传与内在天资' 
-    : '主掌 35 岁后的现实成就、处世手腕、后天努力所铸造的吉凶得失';
+  let systemPrompt: string;
+  let userContent: string;
 
-  const systemPrompt = `你是一位精研中国传统相法（麻衣、柳庄、神相水镜）与现代行为心理学的国手级大师。
+  if (opts.mode === 'palm') {
+    const handSide = opts.handSide || 'right';
+    const handTitle = handSide === 'left' ? '【左手·先天命盘与先天禀赋】' : '【右手·后天造化与行事修为】';
+    const handRole = handSide === 'left'
+      ? '主掌 35 岁前的运势起伏、性格潜意识、父母遗传与内在天资'
+      : '主掌 35 岁后的现实成就、处世手腕、后天努力所铸造的吉凶得失';
+
+    systemPrompt = `你是一位精研中国传统相法（麻衣、柳庄、神相水镜）与现代行为心理学的国手级大师。
 用户正在进行${handTitle}的深度掌纹分析（${handRole}）。
 
 【核心解析准则】：
 1. 严禁单线孤立解读！必须将【单线形态】与【交叉穿插（事业线穿透人天二纹节点、同源异源、横切纹）】、【微观吉凶符号（十字/三角/井字/方格/岛纹）】深度联动剖析。
-2. 严格紧扣“${opts.handSide === 'left' ? '左手先天' : '右手后天'}”的命理特征，分析内容必须高度贴合该手侧的哲学内涵，绝不输出模棱两可、左右手通用的假大空文字。
+2. 严格紧扣"${handSide === 'left' ? '左手先天' : '右手后天'}"的命理特征，分析内容必须高度贴合该手侧的哲学内涵，绝不输出模棱两可、左右手通用的假大空文字。
 3. 每一项详解必须按【线体与交叉事实观察 → 相法古诀与逻辑解析 → 现实吉凶与流年映射】三层深度展开，每项 4-6 句，详尽透彻。
 4. 若用户填写了【咨询提问】，必须在 questionAnswer 中结合该手相的交叉纹路与掌丘气色，分条进行一针见血、逻辑严密的精准预测与解答（每条 4-7 句）。
 
@@ -214,7 +365,7 @@ async function reportOnce(opts: {
     "others": "其他杂纹与皮肤气色辅析"
   },
   "fortuneAnalysis": {
-    "career": "事业财禄深度断语（结合事业线穿插与掌丘饱满度，结合${opts.handSide === 'left' ? '早年中年根基' : '中晚年开拓爆发力'}）",
+    "career": "事业财禄深度断语（结合事业线穿插与掌丘饱满度，结合${handSide === 'left' ? '早年中年根基' : '中晚年开拓爆发力'}）",
     "relationship": "姻缘情感深度断语（结合天纹走向与支线特征）",
     "health": "精气神与健康体质断语（结合地纹深浅、震宫金星丘与掌色）",
     "advice": "修持与趋吉避凶改运建议（3条具体、切实可行的修身立业指导）"
@@ -222,7 +373,7 @@ async function reportOnce(opts: {
   "questionAnswer": "【若有用户提问，结合掌纹交汇特征深度答疑；若无提问则返回空字符串】"
 }`;
 
-  const userContent = `【当前识别手侧】${opts.handSide === 'left' ? '左手（先天命盘）' : '右手（后天修为）'}
+    userContent = `【当前识别手侧】${handSide === 'left' ? '左手（先天命盘）' : '右手（后天修为）'}
 
 【机器视觉提取之掌纹与交汇特征数据】
 ${JSON.stringify(opts.features, null, 2)}
@@ -231,6 +382,53 @@ ${JSON.stringify(opts.features, null, 2)}
 ${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未单独提问，请依据上述掌纹与交叉特征进行全方位命理鉴析）'}
 
 请依据上述具体特征，撰写极具专业度、深度结合交叉复合纹路的命理鉴析报告。`;
+  } else {
+    // face 模式
+    const gender = opts.userGender || 'unspecified';
+    const genderLine = gender === 'male' ? '【男性】' : gender === 'female' ? '【女性】' : '【性别未指定】';
+    const ageLine = opts.userAgeBand ? `年龄段：${opts.userAgeBand}` : '年龄段未知';
+
+    systemPrompt = `你是一位精研中国传统相法（麻衣、柳庄、神相水鉴、太清神鉴）与现代人体美学的国手级大师。
+用户正在进行${genderLine}面相的深度鉴析（${ageLine}）。
+
+【核心解析准则】：
+1. 严禁孤立宫位解读！必须将【三庭五眼比例】、【十二宫吉凶】、【五岳四渎气势】、【动态纹路与气色】深度联动剖析。
+2. 严格紧扣"面相"哲学，分析内容必须高度贴合麻衣十二宫与五岳四渎古诀，绝不输出模棱两可、千人一面的套话。
+3. 每一项详解必须按【骨相与五宫事实观察 → 相法古诀与逻辑解析 → 现实吉凶与流年映射】三层深度展开，每项 4-6 句，详尽透彻。
+4. 若用户填写了【咨询提问】，必须在 questionAnswer 中结合该面部的十二宫气色与三庭比例，分条进行一针见血、逻辑严密的精准预测与解答（每条 4-7 句）。
+
+请严格输出以下 JSON 结构（严禁包含 Markdown 格式）：
+{
+  "faceShape": "面型与五行综合定局（如：田字端正格、用字端厚格，结合下颌与颧骨评述）",
+  "overallAnalysis": "骨相、气色与全局格局总论（结合三庭比例、五岳气势、四渎清浊，4-5句）",
+  "lineAnalysis": {
+    "upperCourt": "上庭详析（额相、印堂、发际与先天根基）",
+    "middleCourt": "中庭详析（眉眼、鼻子、颧骨与35-50岁事业格局）",
+    "lowerCourt": "下庭详析（人中、口形、地阁与晚景福禄）",
+    "twelvePalaces": "十二宫逐宫详析（每宫重点结合吉凶纹痕痣斑）",
+    "complexMarks": "【组合纹痕与气色专项详解】详析法令纹/笑纹/鱼尾/川字/八字等动态纹与痣斑的实际方位与寓意",
+    "others": "其他肤质、神韵、表情习惯辅析"
+  },
+  "fortuneAnalysis": {
+    "career": "事业财禄深度断语（结合官禄宫、财帛宫与迁移宫气色）",
+    "relationship": "姻缘情感深度断语（结合夫妻宫、子女宫与男女宫）",
+    "health": "精气神与健康体质断语（结合疾厄宫、山根与气色明暗）",
+    "advice": "修持与趋吉避凶改运建议（3条具体、切实可行的修身立业指导）"
+  },
+  "questionAnswer": "【若有用户提问，结合面相宫位特征深度答疑；若无提问则返回空字符串】"
+}`;
+
+    userContent = `【当前鉴析对象】${genderLine}
+【年龄段】${ageLine}
+
+【机器视觉提取之面部三庭五眼、十二宫与气色特征数据】
+${JSON.stringify(opts.features, null, 2)}
+
+【用户特定提问】
+${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未单独提问，请依据上述三庭五眼与十二宫特征进行全方位命理鉴析）'}
+
+请依据上述具体特征，撰写极具专业度、深度结合十二宫与五岳气势的面相鉴析报告。`;
+  }
 
   const payload = {
     model: opts.model || 'deepseek-chat',
@@ -273,7 +471,10 @@ ${opts.userQuestion?.trim() ? opts.userQuestion : '（用户未单独提问，�
  */
 async function deepseekReport(opts: {
   configs: Array<{ providerId?: string; baseUrl: string; apiKey: string; model: string }>;
-  handSide: 'left' | 'right';
+  mode: 'palm' | 'face';
+  handSide?: 'left' | 'right';
+  userGender?: 'male' | 'female' | 'unspecified';
+  userAgeBand?: string;
   features: any;
   userQuestion?: string;
 }): Promise<any> {
@@ -285,26 +486,41 @@ async function deepseekReport(opts: {
     } catch (err: any) {
       const msg = err?.message || String(err);
       failures.push(`[${cfg.providerId || 'unknown'}/${cfg.model}] ${msg}`);
-      console.warn(`Palm report provider failed, trying next: ${cfg.providerId || 'unknown'}/${cfg.model}:`, msg);
+      console.warn(`Vision report provider failed, trying next: ${cfg.providerId || 'unknown'}/${cfg.model}:`, msg);
     }
   }
   throw new Error(`All AI providers failed: ${failures.join(' | ')}`);
 }
 
 // =====================================================================
-// POST 统一入口
+// POST 统一入口（手相 + 面相）
 // =====================================================================
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { image, handSide = 'right', userId = 'web-user', question } = body;
+    const {
+      image,
+      mode = 'palm',            // 'palm' | 'face'（默认 palm 兼容旧调用）
+      handSide = 'right',       // palm 模式字段
+      userGender = 'unspecified', // face 模式字段
+      userAgeBand = '',         // face 模式字段（例：'20-30' / '30-40'）
+      userId = 'web-user',
+      question,
+    } = body;
+
+    const currentMode: 'palm' | 'face' = mode === 'face' ? 'face' : 'palm';
 
     if (!image) {
-      return NextResponse.json({ error: '请上传手掌照片' }, { status: 400 });
+      return NextResponse.json(
+        { error: currentMode === 'face' ? '请上传面部照片' : '请上传手掌照片' },
+        { status: 400 },
+      );
     }
 
     const currentHandSide: 'left' | 'right' = handSide === 'left' ? 'left' : 'right';
+    const currentGender: 'male' | 'female' | 'unspecified' =
+      userGender === 'male' || userGender === 'female' ? userGender : 'unspecified';
 
     let mimeType = 'image/jpeg';
     let ext = 'jpg';
@@ -318,15 +534,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. 深度多模态视觉特征提取
-    const features = await visionExtract(base64Pure, mimeType, currentHandSide);
+    const features = currentMode === 'face'
+      ? await visionExtractFace(base64Pure, mimeType, currentGender, typeof userAgeBand === 'string' ? userAgeBand : '')
+      : await visionExtractPalm(base64Pure, mimeType, currentHandSide);
 
-    // 2. 写入 R2 存储桶 (标准 ArrayBuffer 写入)
+    // 2. 写入 R2 存储桶 (R18-5: palm 与 face 用同桶不同前缀)
     let imageKey: string | null = null;
     const r2 = getCloudflareBinding('PALM_IMAGES_BUCKET');
     if (r2 && typeof r2.put === 'function') {
       try {
         const recordId = crypto.randomUUID();
-        imageKey = `palms/${userId}/${recordId}.${ext}`;
+        const prefix = currentMode === 'face' ? 'faces' : 'palms';
+        imageKey = `${prefix}/${userId}/${recordId}.${ext}`;
         const imageBytes = base64ToUint8Array(base64Pure);
 
         await r2.put(imageKey, imageBytes.buffer, {
@@ -334,7 +553,7 @@ export async function POST(request: NextRequest) {
             contentType: mimeType,
           },
         });
-        console.log(`[R2 Success] 图片成功持久化到 R2: ${imageKey}`);
+        console.log(`[R2 Success] 图像成功持久化到 R2: ${imageKey}`);
       } catch (r2Err) {
         console.error('[R2 Error] R2 写入异常:', r2Err);
         imageKey = null;
@@ -343,7 +562,7 @@ export async function POST(request: NextRequest) {
       console.warn('[R2 Warning] 未找到有效的 PALM_IMAGES_BUCKET 实例');
     }
 
-    // 3. 大模型深度命理报告生成（按 provider 优先级链依次回退：OpenRouter → 商汤 → DeepSeek 兜底）
+    // 3. 大模型深度命理报告生成
     const chain = getProviderChain().map((c) => ({
       providerId: c.providerId,
       baseUrl: c.baseUrl,
@@ -356,7 +575,10 @@ export async function POST(request: NextRequest) {
       try {
         report = await deepseekReport({
           configs: chain,
-          handSide: currentHandSide,
+          mode: currentMode,
+          handSide: currentMode === 'palm' ? currentHandSide : undefined,
+          userGender: currentMode === 'face' ? currentGender : undefined,
+          userAgeBand: currentMode === 'face' ? (typeof userAgeBand === 'string' ? userAgeBand : '') : undefined,
           features,
           userQuestion: typeof question === 'string' ? question : '',
         });
@@ -365,30 +587,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const finalData = report || {
-      handType: features.handType,
-      overallAnalysis: features.supplement || '手相气色明朗，骨肉停匀。',
-      lineAnalysis: {
-        ...(features.palmFeatures || {}),
-        complexCrossings: `【组合特征】：${features.complexCrossPatterns?.jointSource || ''}；${features.complexCrossPatterns?.crossingIntersections || ''}；${features.complexCrossPatterns?.specialSymbols || ''}`
-      },
-      fortuneAnalysis: {
-        career: currentHandSide === 'left' ? "先天根基厚实，早年多得师长提携，宜稳步积累专业底蕴。" : "后天实干开拓力强，中年事业节节攀升，三十五岁后大有可为。",
-        relationship: "重情守诺，感情真挚，夫妻同心互旺。",
-        health: "精力充沛，日常宜劳逸结合，固护脾胃元气。",
-        advice: "顺应天时，内修定力，外修人脉，必成大器。"
-      },
-      questionAnswer: '',
-      _fallback: true,
-    };
+    let finalData: any;
+    if (report) {
+      finalData = report;
+    } else if (currentMode === 'palm') {
+      finalData = {
+        handType: features.handType,
+        overallAnalysis: features.supplement || '手相气色明朗，骨肉停匀。',
+        lineAnalysis: {
+          ...(features.palmFeatures || {}),
+          complexCrossings: `【组合特征】：${features.complexCrossPatterns?.jointSource || ''}；${features.complexCrossPatterns?.crossingIntersections || ''}；${features.complexCrossPatterns?.specialSymbols || ''}`,
+        },
+        fortuneAnalysis: {
+          career: currentHandSide === 'left' ? "先天根基厚实，早年多得师长提携，宜稳步积累专业底蕴。" : "后天实干开拓力强，中年事业节节攀升，三十五岁后大有可为。",
+          relationship: "重情守诺，感情真挚，夫妻同心互旺。",
+          health: "精力充沛，日常宜劳逸结合，固护脾胃元气。",
+          advice: "顺应天时，内修定力，外修人脉，必成大器。",
+        },
+        questionAnswer: '',
+        _fallback: true,
+      };
+    } else {
+      finalData = {
+        faceShape: features.faceShape,
+        overallAnalysis: features.supplement || '面部气色明润，骨肉停匀。',
+        lineAnalysis: {
+          upperCourt: features.threeCourtFiveEyes?.upperCourt,
+          middleCourt: features.threeCourtFiveEyes?.middleCourt,
+          lowerCourt: features.threeCourtFiveEyes?.lowerCourt,
+          twelvePalaces: features.twelvePalaces,
+          complexMarks: `【组合特征】${features.complexMarks?.dynamicLines || ''}；${features.complexMarks?.molesAndSpots || ''}；${features.complexMarks?.auraColor || ''}`,
+        },
+        fortuneAnalysis: {
+          career: "十二宫官禄宫与财帛宫气色明润，主事业根基稳健，财禄正印兼具。",
+          relationship: "夫妻宫与子女宫配合良好，主姻缘和顺、子女缘厚。",
+          health: "疾厄宫清朗、山根不塌，主脏腑少疾；日常宜固护脾胃、调息养神。",
+          advice: "以五岳之势稳扎稳打，外修人脉、内修定力，厚德方能载福。",
+        },
+        questionAnswer: '',
+        _fallback: true,
+      };
+    }
 
-    // 4. 写入 D1 数据库
+    // 4. 写入 D1 数据库 (R18-5: mode 列已就绪；兼容历史 palm 数据)
     const db = getCloudflareBinding('QUERY_LOGS_DB');
     if (db && typeof db.prepare === 'function') {
       try {
         await db.prepare(`
-          INSERT INTO palm_records (id, user_id, image_key, image_url, extracted_features, report_content, hand_side, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          INSERT INTO palm_records (id, user_id, image_key, image_url, extracted_features, report_content, hand_side, mode, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
         `).bind(
           crypto.randomUUID(),
           userId,
@@ -396,9 +643,10 @@ export async function POST(request: NextRequest) {
           imageKey ? `/api/palm-image/${imageKey}` : '',
           JSON.stringify(features),
           JSON.stringify(finalData),
-          currentHandSide
+          currentMode === 'palm' ? currentHandSide : 'face',  // face 模式下 hand_side 写 'face' 作占位
+          currentMode,
         ).run();
-        console.log(`[D1 Success] 手相记录成功存入数据库`);
+        console.log(`[D1 Success] ${currentMode === 'face' ? '面相' : '手相'}记录成功存入数据库`);
       } catch (dbErr) {
         console.warn('D1 写入跳过:', dbErr);
       }
@@ -406,11 +654,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      mode: currentMode,
       data: finalData,
       imageUrl: imageKey ? `/api/palm-image/${imageKey}` : null,
     });
   } catch (error: any) {
-    console.error('Hand analysis fatal error:', error);
+    console.error('Vision analysis fatal error:', error);
     return NextResponse.json({ error: error?.message || '分析服务异常' }, { status: 500 });
   }
 }
