@@ -28,6 +28,7 @@ declare module 'lunar-javascript' {
     getMonthInGanZhiExact(): string;
     getDayInGanZhiExact(): string;
     getTimeInGanZhi(): string;
+    getYearShengXiao(): string;
     getDayXunExact(): string;
     getDayXunKongExact(): string;
     getTimeXun(): string;
