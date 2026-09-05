@@ -200,12 +200,47 @@ export default function LiuyaoPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
       <div className="max-w-3xl mx-auto">
         {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
           <Link href="/" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
             ← 返回首页
           </Link>
           <h1 className="text-xl font-bold tracking-wider text-amber-400">六爻 · 起卦解卦</h1>
           <div className="w-12"></div>
+        </div>
+
+        {/* ── 六爻专属 Hero Banner：卦象六爻线 ── */}
+        <div data-banner="liuyao" className="relative overflow-hidden rounded-2xl mb-6 p-5 border border-amber-900/50 bg-gradient-to-br from-amber-950/30 via-slate-900 to-rose-950/30 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <svg viewBox="0 0 120 120" className="w-20 h-20 flex-shrink-0" aria-hidden="true">
+              {/* 水火既济卦象：阴阳爻组合 */}
+              <g stroke="rgba(245,158,11,0.85)" strokeWidth="3.5" strokeLinecap="round">
+                <line x1="20" y1="20" x2="50" y2="20" />
+                <line x1="70" y1="20" x2="100" y2="20" />
+                <line x1="20" y1="36" x2="100" y2="36" />
+                <line x1="20" y1="52" x2="48" y2="52" />
+                <line x1="72" y1="52" x2="100" y2="52" />
+                <line x1="20" y1="68" x2="100" y2="68" />
+                <line x1="20" y1="84" x2="48" y2="84" />
+                <line x1="72" y1="84" x2="100" y2="84" />
+                <line x1="20" y1="100" x2="100" y2="100" />
+              </g>
+              {/* 动爻标记（第三爻） */}
+              <text x="110" y="56" fontSize="9" fill="rgba(244,63,94,0.95)" fontWeight="bold">动</text>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <span className="text-base font-bold text-amber-300">周易古占 · 铜钱摇卦</span>
+                <span className="text-[10px] text-rose-300/80 font-mono tracking-widest">LIÙ YÁO</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                京房纳甲法，秦汉以来最盛之占。一卦六爻，初爻为始、上爻为终；
+                <span className="text-amber-300 font-semibold">纳甲</span>
+                排干支于爻中、<span className="text-emerald-300 font-semibold">六亲</span>
+                据卦宫定之、<span className="text-rose-300 font-semibold">六兽</span>
+                按时起之，世应定位、用神居中。本局程序严判卦象、纳甲、世应、动爻、用神、格局。
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 输入表单 */}

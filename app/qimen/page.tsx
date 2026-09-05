@@ -293,12 +293,53 @@ export default function QimenPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
       <div className="max-w-3xl mx-auto">
         {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
           <Link href="/" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
             ← 返回首页
           </Link>
           <h1 className="text-xl font-bold tracking-wider text-emerald-400">奇门遁甲 · 起局解盘</h1>
           <div className="w-12"></div>
+        </div>
+
+        {/* ── 奇门专属 Hero Banner：洛书九宫意象 ── */}
+        <div data-banner="qimen" className="relative overflow-hidden rounded-2xl mb-6 p-5 border border-emerald-900/50 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-amber-950/30 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <svg viewBox="0 0 120 120" className="w-20 h-20 flex-shrink-0" aria-hidden="true">
+              {/* 洛书九宫格 4-9-2 / 3-5-7 / 8-1-6 */}
+              <g fill="none" stroke="rgba(16,185,129,0.45)" strokeWidth="1">
+                <rect x="5" y="5" width="110" height="110" />
+                <line x1="41.67" y1="5" x2="41.67" y2="115" />
+                <line x1="78.33" y1="5" x2="78.33" y2="115" />
+                <line x1="5" y1="41.67" x2="115" y2="41.67" />
+                <line x1="5" y1="78.33" x2="115" y2="78.33" />
+              </g>
+              {/* 数字 */}
+              <g fontSize="9" fontWeight="bold" textAnchor="middle" fill="rgba(240,208,112,0.85)">
+                <text x="23" y="27">4</text>
+                <text x="60" y="27">9</text>
+                <text x="97" y="27">2</text>
+                <text x="23" y="64">3</text>
+                <text x="60" y="64">5</text>
+                <text x="97" y="64">7</text>
+                <text x="23" y="100">8</text>
+                <text x="60" y="100">1</text>
+                <text x="97" y="100">6</text>
+              </g>
+              {/* 曲线轨迹 */}
+              <path d="M 23 23 L 97 23 L 97 100 L 23 100 L 23 60" fill="none" stroke="rgba(240,208,112,0.6)" strokeWidth="1.2" strokeDasharray="2 2" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <span className="text-base font-bold text-emerald-300">帝王之学 · 洛书九宫</span>
+                <span className="text-[10px] text-amber-300/80 font-mono tracking-widest">JÌ MÉN DÙN JIǍ</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                黄帝伐蚩尤，得玄女符箓于九宫洛书。阳遁九局、阴遁九局，合为十八局；天盘、地盘旋转叠合，八门、九星、八神各归其宫，以
+                <span className="text-emerald-300 font-semibold">值符值使</span>
+                为枢，<span className="text-amber-300 font-semibold">击刑入墓</span> 为忌。本局以时家奇门起盘，程序严判十八局、用神、格局、化解。
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 输入表单 */}

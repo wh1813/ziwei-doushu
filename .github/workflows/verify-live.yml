@@ -36,6 +36,64 @@ jobs:
           print(f'HOMEPAGE ENTRIES CHECK: {len(modules)} cards + {len(nav_items)} nav buttons all present')
           PY
 
+      - name: R18-6 banner differentiation check
+        run: |
+          # 4 个术数页面必须有独立的 data-banner 属性与独特 tagline
+          python3 - <<'PY'
+          import urllib.request, re, sys
+          BASE = 'https://symgxm.hulu.kdns.fr'
+          spec = [
+              ('/qimen',     'qimen',     ['data-banner="qimen"',     '帝王之学',  '洛书九宫']),
+              ('/liuyao',    'liuyao',    ['data-banner="liuyao"',    '周易古占',  '铜钱摇卦']),
+              ('/daliuren',  'daliuren',  ['data-banner="daliuren"',  '袖中一诀',  '天地盘叠']),
+              ('/xiaoliuren','xiaoliuren',['data-banner="xiaoliuren"','诸葛马前',  '掐指一算']),
+          ]
+          fails = 0
+          for path, key, must in spec:
+              html = urllib.request.urlopen(BASE + path, timeout=30).read().decode('utf-8', errors='replace')
+              missing = [m for m in must if m not in html]
+              status = 'OK  ' if not missing else 'FAIL'
+              print(f'{status} {path:14s} size={len(html):6d}  missing={missing}')
+              fails += len(missing)
+          # 跨页互斥性：每个页面的独特 tagline 不应出现在其他页面
+          exclusivity = [
+              ('/qimen',      'data-banner="liuyao"',     False),
+              ('/qimen',      'data-banner="daliuren"',   False),
+              ('/qimen',      'data-banner="xiaoliuren"', False),
+              ('/liuyao',     'data-banner="qimen"',      False),
+              ('/liuyao',     'data-banner="daliuren"',   False),
+              ('/liuyao',     'data-banner="xiaoliuren"', False),
+              ('/daliuren',   'data-banner="qimen"',      False),
+              ('/daliuren',   'data-banner="liuyao"',     False),
+              ('/daliuren',   'data-banner="xiaoliuren"', False),
+              ('/xiaoliuren', 'data-banner="qimen"',      False),
+              ('/xiaoliuren', 'data-banner="liuyao"',     False),
+              ('/xiaoliuren', 'data-banner="daliuren"',   False),
+          ]
+          cache = {}
+          for path, marker, expect in exclusivity:
+              if path not in cache:
+                  cache[path] = urllib.request.urlopen(BASE + path, timeout=30).read().decode('utf-8', errors='replace')
+              html = cache[path]
+              present = marker in html
+              ok = (present == expect)
+              status = 'OK  ' if ok else 'FAIL'
+              if expect:
+                  print(f'{status} {path:14s} should HAVE    {marker}  present={present}')
+              else:
+                  print(f'{status} {path:14s} should MISS    {marker}  present={present}')
+              if not ok: fails += 1
+          # 首页 sigil tagline 必须出现在 6 张卡片里
+          home = urllib.request.urlopen(BASE + '/', timeout=30).read().decode('utf-8', errors='replace')
+          sigils = ['命宫十四主', '三才纹', '洛书九宫', '京房纳甲', '月将加时', '大安起月']
+          miss_sigil = [s for s in sigils if s not in home]
+          print(('OK  ' if not miss_sigil else 'FAIL') + f' HOMEPAGE sigil tagline  missing={miss_sigil}')
+          fails += len(miss_sigil)
+          if fails:
+              sys.exit(f'R18-6 banner differentiation check failed: {fails} issues')
+          print('R18-6 BANNER DIFFERENTIATION: 4 distinct banners + homepage sigils all green')
+          PY
+
       - name: Detailed /qimen diagnostics
         run: |
           echo "--- headers ---"

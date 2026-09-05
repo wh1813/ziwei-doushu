@@ -178,12 +178,52 @@ export default function XiaoliurenPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
       <div className="max-w-3xl mx-auto">
         {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
           <Link href="/" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
             ← 返回首页
           </Link>
           <h1 className="text-xl font-bold tracking-wider text-cyan-400">小六壬 · 诸葛马前课</h1>
           <div className="w-12"></div>
+        </div>
+
+        {/* ── 小六壬专属 Hero Banner：掌诀六神圆环 ── */}
+        <div data-banner="xiaoliuren" className="relative overflow-hidden rounded-2xl mb-6 p-5 border border-cyan-900/50 bg-gradient-to-br from-cyan-950/30 via-slate-900 to-amber-950/30 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <svg viewBox="0 0 120 120" className="w-20 h-20 flex-shrink-0" aria-hidden="true">
+              {/* 掌诀六神圆环 */}
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(34,211,238,0.4)" strokeWidth="1.5" />
+              {/* 六等分 */}
+              <g fill="rgba(240,208,112,0.95)" fontSize="10" fontWeight="bold" textAnchor="middle">
+                <text x="60" y="18">大安</text>
+                <text x="98" y="44">留连</text>
+                <text x="98" y="80">速喜</text>
+                <text x="60" y="106">赤口</text>
+                <text x="22" y="80">小吉</text>
+                <text x="22" y="44">空亡</text>
+              </g>
+              {/* 中央圆 */}
+              <circle cx="60" cy="60" r="14" fill="rgba(34,211,238,0.15)" stroke="rgba(34,211,238,0.7)" strokeWidth="1" />
+              <text x="60" y="64" fontSize="11" fontWeight="bold" textAnchor="middle" fill="rgba(255,255,255,0.95)">掌诀</text>
+              {/* 三步轨迹箭头：月→日→时 */}
+              <g fill="none" stroke="rgba(244,114,182,0.85)" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M 60 18 A 50 50 0 0 1 60 110" strokeDasharray="3 2" />
+                <polygon points="58,107 62,107 60,113" fill="rgba(244,114,182,0.85)" stroke="none" />
+              </g>
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <span className="text-base font-bold text-cyan-300">诸葛马前 · 掐指一算</span>
+                <span className="text-[10px] text-amber-300/80 font-mono tracking-widest">XIǍO LIÙ RÉN</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                诸葛亮行军途中创制，<span className="text-amber-300 font-semibold">只需月日时三步</span>：
+                大安起月、月上起日、日上起时——
+                <span className="text-cyan-300 font-semibold">大安 / 速喜 / 小吉</span>
+                为吉，<span className="text-rose-300 font-semibold">留连 / 赤口 / 空亡</span>
+                为凶。轻巧迅捷，<span className="font-semibold">掐指即得</span>。本局程序严判掌诀六神与吉凶等级。
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 输入表单 */}

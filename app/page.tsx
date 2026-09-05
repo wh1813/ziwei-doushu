@@ -91,14 +91,16 @@ const ENTRIES = [
     key: 'chart',
     title: '紫微斗数排盘',
     desc: '输入出生年月日时，生成专属命盘，AI 按倪海夏体系深度解读。',
+    sigil: '命宫十四主 · 三方四正',
     cta: '立即起盘',
     icon: '◉',
     accent: 'gold',
   },
   {
     key: 'palm',
-    title: '手相分析',
-    desc: '上传手掌照片，AI 识别掌纹特征，解读性格、事业与感情。',
+    title: '手相 / 面相',
+    desc: '上传手掌或面部照片，AI 识掌纹/三庭五眼，解读性格、事业与感情。',
+    sigil: '三才纹 · 三庭五眼',
     cta: '开始分析',
     icon: '✋',
     accent: 'blue',
@@ -107,6 +109,7 @@ const ENTRIES = [
     key: 'qimen',
     title: '奇门遁甲',
     desc: '确定性起局排盘零幻觉，AI 依用神与格局解盘，给出方位与时机建议。',
+    sigil: '洛书九宫 · 阴阳遁十八局',
     cta: '开始起局',
     icon: '▦',
     accent: 'teal',
@@ -115,6 +118,7 @@ const ENTRIES = [
     key: 'liuyao',
     title: '六爻起卦',
     desc: '按京房纳甲法起卦，AI 依用神与动爻解卦，预测所问之事的成与不成。',
+    sigil: '京房纳甲 · 六爻安世应',
     cta: '开始起卦',
     icon: '☰',
     accent: 'purple',
@@ -123,6 +127,7 @@ const ENTRIES = [
     key: 'daliuren',
     title: '大六壬起课',
     desc: '依月将加时起天地盘，AI 依贼克、比用、涉害三法推导四课三传，详断所占吉凶。',
+    sigil: '月将加时 · 四课三传',
     cta: '开始起课',
     icon: '☵',
     accent: 'indigo',
@@ -131,6 +136,7 @@ const ENTRIES = [
     key: 'xiaoliuren',
     title: '小六壬掌诀',
     desc: '诸葛马前课，仅用月日时三步掌诀顺数，掐指一算当即立断。',
+    sigil: '大安起月 · 掐指即得',
     cta: '掐指起课',
     icon: '☷',
     accent: 'cyan',
@@ -278,7 +284,8 @@ export default function HomePage() {
                     boxShadow: c.cardShadow,
                   }}>
                   <div className="text-3xl mb-4" style={{ color: accentColor }}>{e.icon}</div>
-                  <div className="text-xl font-semibold mb-2 tracking-wide" style={{ color: c.textPrimary }}>{e.title}</div>
+                  <div className="text-xl font-semibold mb-1.5 tracking-wide" style={{ color: c.textPrimary }}>{e.title}</div>
+                  <div className="text-[10px] tracking-[0.2em] mb-2 font-mono uppercase opacity-80" style={{ color: accentColor }}>{e.sigil}</div>
                   <div className="text-xs leading-relaxed mb-5" style={{ color: c.textMuted }}>{e.desc}</div>
                   <div className="text-[12px] tracking-widest" style={{ color: accentColor }}>
                     {e.cta} →

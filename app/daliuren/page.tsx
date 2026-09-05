@@ -177,12 +177,50 @@ export default function DaliurenPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
       <div className="max-w-3xl mx-auto">
         {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
           <Link href="/" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
             ← 返回首页
           </Link>
           <h1 className="text-xl font-bold tracking-wider text-indigo-400">大六壬 · 起课解课</h1>
           <div className="w-12"></div>
+        </div>
+
+        {/* ── 大六壬专属 Hero Banner：天地盘叠加意象 ── */}
+        <div data-banner="daliuren" className="relative overflow-hidden rounded-2xl mb-6 p-5 border border-indigo-900/50 bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-950 shadow-lg">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <svg viewBox="0 0 120 120" className="w-20 h-20 flex-shrink-0" aria-hidden="true">
+              {/* 地盘（外圈） */}
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(99,102,241,0.45)" strokeWidth="1.5" />
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(99,102,241,0.25)" strokeWidth="0.5" strokeDasharray="2 3" />
+              {/* 天盘（内圈，旋转 15°） */}
+              <g transform="rotate(15 60 60)">
+                <circle cx="60" cy="60" r="32" fill="none" stroke="rgba(165,180,252,0.75)" strokeWidth="1.5" />
+                <circle cx="60" cy="60" r="32" fill="none" stroke="rgba(165,180,252,0.3)" strokeDasharray="2 3" strokeWidth="0.5" />
+              </g>
+              {/* 月将点 */}
+              <circle cx="60" cy="10" r="2.5" fill="rgba(240,208,112,0.95)" />
+              {/* 天乙贵人点 */}
+              <circle cx="105" cy="60" r="2.5" fill="rgba(244,114,182,0.95)" />
+              {/* 中宫五 */}
+              <text x="60" y="63" fontSize="9" fontWeight="bold" textAnchor="middle" fill="rgba(255,255,255,0.85)">五</text>
+              {/* 旋转箭头 */}
+              <path d="M 60 14 A 50 50 0 0 1 86 30" fill="none" stroke="rgba(165,180,252,0.6)" strokeWidth="1.2" />
+              <polygon points="86,30 89,26 92,30" fill="rgba(165,180,252,0.6)" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1.5">
+                <span className="text-base font-bold text-indigo-300">袖中一诀 · 天地盘叠</span>
+                <span className="text-[10px] text-sky-300/80 font-mono tracking-widest">DÀ LIÙ RÉN</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                大六壬，<span className="text-amber-300 font-semibold">月将加时</span>，地盘不动、天盘旋转叠合；
+                取<span className="text-rose-300 font-semibold">天乙贵人</span>
+                （阳贵阴贵分顺逆），
+                <span className="text-indigo-300 font-semibold">贼克/比用/涉害</span>
+                推四课三传——初传发用、中传进退、末传归结。本局程序严判十二天神、天地盘、四课三传、贼克三法。
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 输入表单 */}
