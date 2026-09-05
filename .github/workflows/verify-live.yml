@@ -653,25 +653,29 @@ jobs:
       - name: Smoke /api/fortune-report (SSE)
         run: |
           set +e
-          # 先起一个真实 qimen 盘
-          chart_json=$(curl -s -X POST "$BASE_URL/api/qimen-chart" \
+          # 先起一个真实 qimen 盘，存到 /tmp/qimen_chart.json
+          curl -s -X POST "$BASE_URL/api/qimen-chart" \
             -H "Content-Type: application/json" \
-            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}')
-          code=$(curl -s -o /tmp/fortune_sse.txt -w "%{http_code}" --max-time 180 \
-            -X POST "$BASE_URL/api/fortune-report" \
-            -H "Content-Type: application/json" \
-            -d "$(python3 -c "
-import json
-chart = $chart_json
+            -d '{"solarDate":"2026-03-24","timeIndex":5,"questionType":"事业"}' \
+            -o /tmp/qimen_chart.json
+          # 用 Python 包装成 fortune-report 期望的 payload（避免 YAML/bash 嵌套）
+          python3 - /tmp/qimen_chart.json > /tmp/fortune_payload.json <<'PYEOF'
+import json, sys
+with open(sys.argv[1], 'r', encoding='utf-8') as f:
+    chart = json.load(f)
 payload = {
   'charts': [{'module': 'qimen', 'json': chart}],
   'period': 'month',
   'focus': 'overall',
   'birthDate': None,
-  'birthTimeIndex': None
+  'birthTimeIndex': None,
 }
 print(json.dumps(payload, ensure_ascii=False))
-")")
+PYEOF
+          code=$(curl -s -o /tmp/fortune_sse.txt -w "%{http_code}" --max-time 180 \
+            -X POST "$BASE_URL/api/fortune-report" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/fortune_payload.json)
           curl_rc=$?
           set -e
           echo "POST /api/fortune-report -> HTTP $code (curl rc=$curl_rc)"
