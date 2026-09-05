@@ -111,6 +111,14 @@ const ENTRIES = [
     icon: '▦',
     accent: 'teal',
   },
+  {
+    key: 'liuyao',
+    title: '六爻起卦',
+    desc: '按京房纳甲法起卦，AI 依用神与动爻解卦，预测所问之事的成与不成。',
+    cta: '开始起卦',
+    icon: '☰',
+    accent: 'purple',
+  },
 ];
 
 // ─── 主页（精简版：排盘 + 手相 + 奇门）─────────────────────
@@ -173,6 +181,13 @@ export default function HomePage() {
             style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
             奇门
           </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => router.push('/liuyao')}
+            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
+            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
+            六爻
+          </motion.button>
         </div>
       </nav>
 
@@ -193,13 +208,13 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.45 }}
             className="text-sm max-w-xl mx-auto leading-relaxed mb-12"
             style={{ color: c.textMuted }}>
-            紫微排盘 · 手相分析 · 奇门遁甲 — 简易操作，即刻解读
+            紫微排盘 · 手相分析 · 奇门遁甲 · 六爻起卦 — 简易操作，即刻解读
           </motion.p>
 
           {/* 三大功能入口 */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.6 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto">
+            className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
             {ENTRIES.map((e) => {
               const isGold = e.accent === 'gold';
               const accentColor = e.accent === 'purple'

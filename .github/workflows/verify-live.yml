@@ -20,6 +20,21 @@ jobs:
               cat /tmp/probe.html; echo
             fi
           done
+          # Homepage 入口文字断言：确保所有上线模块都有入口卡 + 导航按钮
+          curl -s -o /tmp/home.html "$BASE_URL/"
+          python3 - <<'PY'
+          import sys
+          body = open('/tmp/home.html', encoding='utf-8', errors='replace').read()
+          modules = ['紫微斗数排盘', '手相分析', '奇门遁甲', '六爻起卦']
+          nav_items = ['紫微排盘', '手相', '奇门', '六爻']
+          missing = [m for m in modules if m not in body]
+          nav_missing = [n for n in nav_items if n not in body]
+          if missing:
+              sys.exit('homepage missing entry cards: ' + ', '.join(missing))
+          if nav_missing:
+              sys.exit('homepage nav missing: ' + ', '.join(nav_missing))
+          print(f'HOMEPAGE ENTRIES CHECK: {len(modules)} cards + {len(nav_items)} nav buttons all present')
+          PY
 
       - name: Detailed /qimen diagnostics
         run: |
