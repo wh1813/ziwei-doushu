@@ -19,6 +19,7 @@ export default function TopNav() {
     { key: 'liuyao',      label: '六爻',     path: '/liuyao' },
     { key: 'daliuren',    label: '大六壬',   path: '/daliuren' },
     { key: 'xiaoliuren',  label: '小六壬',   path: '/xiaoliuren' },
+    { key: 'fortune',     label: '运势',     path: '/fortune' },
   ];
 
   // 主题色：dark 用半透明白底 + 金线，light 用金底白字
