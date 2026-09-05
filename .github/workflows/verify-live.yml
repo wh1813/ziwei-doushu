@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Probe routes
         run: |
-          for path in / /qimen /liuyao /tianji /chart; do
+          for path in / /qimen /liuyao /daliuren /tianji /chart; do
             code=$(curl -s -o /tmp/probe.html -w "%{http_code}" "$BASE_URL$path")
             echo "GET $path -> HTTP $code ($(wc -c < /tmp/probe.html) bytes)"
             if [ "$code" != "200" ]; then
@@ -25,8 +25,8 @@ jobs:
           python3 - <<'PY'
           import sys
           body = open('/tmp/home.html', encoding='utf-8', errors='replace').read()
-          modules = ['紫微斗数排盘', '手相分析', '奇门遁甲', '六爻起卦']
-          nav_items = ['紫微排盘', '手相', '奇门', '六爻']
+          modules = ['紫微斗数排盘', '手相分析', '奇门遁甲', '六爻起卦', '大六壬起课']
+          nav_items = ['紫微排盘', '手相', '奇门', '六爻', '大六壬']
           missing = [m for m in modules if m not in body]
           nav_missing = [n for n in nav_items if n not in body]
           if missing:
@@ -269,6 +269,110 @@ jobs:
             echo "::warning::liuyao interpret 503 - AI provider key likely not set on Worker (chart path unaffected)"
           elif [ "$curl_rc" = "28" ] || [ "$code" = "000" ]; then
             echo "::warning::liuyao interpret SSE timed out after 180s - upstream free-model queuing latency (provider-side, chart path unaffected, not a deploy defect)"
+          else
+            echo "::error::unexpected status $code"
+            exit 1
+          fi
+
+      - name: Probe /daliuren page
+        run: |
+          code=$(curl -s -o /tmp/daliuren.html -w "%{http_code}" "$BASE_URL/daliuren")
+          echo "GET /daliuren -> HTTP $code ($(wc -c < /tmp/daliuren.html) bytes)"
+          if [ "$code" != "200" ]; then
+            echo "--- body ---"; cat /tmp/daliuren.html; echo; exit 1
+          fi
+          # 简单 grep：页面必须含「起课解课」标题
+          if ! grep -q "起课解课" /tmp/daliuren.html; then
+            echo "::error::daliuren page missing header"; head -100 /tmp/daliuren.html; exit 1
+          fi
+          echo "DALIUREN PAGE: PASS"
+
+      - name: Golden check /api/daliuren-chart (2024-09-15 申时, 求财, 男)
+        run: |
+          code=$(curl -s -o /tmp/dr_chart.json -w "%{http_code}" -X POST "$BASE_URL/api/daliuren-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2024-09-15","timeIndex":8,"questionType":"求财","questionGoal":"测试","gender":"男"}')
+          echo "POST /api/daliuren-chart -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "--- error body ---"; cat /tmp/dr_chart.json; echo; exit 1
+          fi
+          python3 - <<'PY'
+          import json, sys
+          live = json.load(open("/tmp/dr_chart.json"))
+          pan = live.get("pan") or {}
+          guiren = live.get("guiren") or {}
+          siKe = live.get("siKe") or {}
+          sanChuan = live.get("sanChuan") or {}
+          liuqin = live.get("sanChuanLiuqin") or {}
+          ganzhi = live.get("ganzhi") or {}
+          checks = [
+              ("pan.yueJiang",         pan.get("yueJiang"),                                  "大吉"),
+              ("pan.yueJiangSuoCheng", pan.get("yueJiangSuoCheng"),                          "申"),
+              ("guiren.used.zhi",      (guiren.get("used") or {}).get("zhi"),                "巳"),
+              ("guiren.used.cheng",    (guiren.get("used") or {}).get("cheng"),              "顺治"),
+              ("ganzhi.day",           ganzhi.get("day"),                                    "壬午"),
+              ("ganzhi.dayGan",        ganzhi.get("dayGan"),                                 "壬"),
+              ("siKe.first.xia",       (siKe.get("first") or {}).get("xia"),                 "亥庚"),
+              ("siKe.first.shang",     (siKe.get("first") or {}).get("shang"),               "寅庚"),
+              ("siKe.fourth.xia",      (siKe.get("fourth") or {}).get("xia"),                "午丁"),
+              ("siKe.fourth.shang",    (siKe.get("fourth") or {}).get("shang"),              "丑壬"),
+              ("sanChuan.keti",        sanChuan.get("keti"),                                 "贼克"),
+              ("sanChuan.chu.zhi",     (sanChuan.get("chu") or {}).get("zhi"),               "丑"),
+              ("sanChuan.chu.gan",     (sanChuan.get("chu") or {}).get("gan"),               "壬"),
+              ("sanChuan.zhong.zhi",   (sanChuan.get("zhong") or {}).get("zhi"),             "亥"),
+              ("liuqin.chu",           liuqin.get("chu"),                                    "官鬼"),
+              ("detected[0]贼克",      (live.get("detected") or [None])[0] and "贼克" in (live.get("detected") or [""])[0], True),
+              ("pan.diban.len",        len(pan.get("diban") or []),                          12),
+              ("pan.tianban.len",      len(pan.get("tianban") or []),                        12),
+          ]
+          fails = 0
+          for name, got, want in checks:
+              ok = got == want
+              print(("OK  " if ok else "FAIL") + f" {name}: live={got!r} expect={want!r}")
+              fails += 0 if ok else 1
+          # recordId 是 best-effort：D1 表未建时为 null（设计如此）
+          if live.get("recordId"):
+              print(f"OK   recordId: live={live['recordId']!r} (daliuren_records 落库已生效)")
+          else:
+              print("::warning::recordId 为空：daliuren_records 表可能未建/迁移未应用；best-effort 不阻塞")
+          if fails:
+              sys.exit(f"{fails} daliuren golden mismatches")
+          print("DALIUREN GOLDEN LIVE CHECK: ALL MATCH")
+          PY
+
+      - name: Validation check /api/daliuren-chart (bad input)
+        run: |
+          code=$(curl -s -o /tmp/dr_bad.json -w "%{http_code}" -X POST "$BASE_URL/api/daliuren-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"not-a-date","timeIndex":99,"questionType":"求财"}')
+          echo "POST /api/daliuren-chart(bad date+time) -> HTTP $code"
+          if [ "$code" != "400" ]; then
+            echo "::error::expected 400 for bad input, got $code"; cat /tmp/dr_bad.json; exit 1
+          fi
+          echo "DALIUREN BAD-INPUT CHECK: PASS (HTTP 400)"
+
+      - name: Smoke test /api/daliuren-interpret (SSE)
+        run: |
+          set +e
+          chart_json=$(curl -s -X POST "$BASE_URL/api/daliuren-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2024-09-15","timeIndex":8,"questionType":"求财","questionGoal":"测试","gender":"男"}')
+          record_id=$(echo "$chart_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('recordId') or '')")
+          echo "Got recordId: ${record_id:-<none>}"
+          code=$(curl -s -o /tmp/dr_interp.txt -w "%{http_code}" --max-time 180 \
+            -X POST "$BASE_URL/api/daliuren-interpret" \
+            -H "Content-Type: application/json" \
+            -d "{\"solarDate\":\"2024-09-15\",\"timeIndex\":8,\"questionType\":\"求财\",\"questionGoal\":\"测试\",\"gender\":\"男\",\"recordId\":\"$record_id\"}")
+          curl_rc=$?
+          set -e
+          echo "POST /api/daliuren-interpret -> HTTP $code (curl rc=$curl_rc)"
+          head -c 300 /tmp/dr_interp.txt; echo
+          if [ "$code" = "200" ]; then
+            echo "daliuren interpret SSE OK"
+          elif [ "$code" = "503" ]; then
+            echo "::warning::daliuren interpret 503 - AI provider key likely not set on Worker (chart path unaffected)"
+          elif [ "$curl_rc" = "28" ] || [ "$code" = "000" ]; then
+            echo "::warning::daliuren interpret SSE timed out after 180s - upstream free-model queuing latency (provider-side, chart path unaffected, not a deploy defect)"
           else
             echo "::error::unexpected status $code"
             exit 1

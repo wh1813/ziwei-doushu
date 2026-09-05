@@ -119,6 +119,14 @@ const ENTRIES = [
     icon: '☰',
     accent: 'purple',
   },
+  {
+    key: 'daliuren',
+    title: '大六壬起课',
+    desc: '依月将加时起天地盘，AI 依贼克、比用、涉害三法推导四课三传，详断所占吉凶。',
+    cta: '开始起课',
+    icon: '☵',
+    accent: 'indigo',
+  },
 ];
 
 // ─── 主页（精简版：排盘 + 手相 + 奇门）─────────────────────
@@ -188,6 +196,13 @@ export default function HomePage() {
             style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
             六爻
           </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => router.push('/daliuren')}
+            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
+            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
+            大六壬
+          </motion.button>
         </div>
       </nav>
 
@@ -208,7 +223,7 @@ export default function HomePage() {
             transition={{ duration: 0.7, delay: 0.45 }}
             className="text-sm max-w-xl mx-auto leading-relaxed mb-12"
             style={{ color: c.textMuted }}>
-            紫微排盘 · 手相分析 · 奇门遁甲 · 六爻起卦 — 简易操作，即刻解读
+            紫微排盘 · 手相分析 · 奇门遁甲 · 六爻起卦 · 大六壬起课 — 简易操作，即刻解读
           </motion.p>
 
           {/* 三大功能入口 */}
@@ -221,12 +236,16 @@ export default function HomePage() {
                 ? '#a855f7'
                 : e.accent === 'teal'
                   ? '#14b8a6'
-                  : isGold ? c.goldSolid : '#3a78d4';
+                  : e.accent === 'indigo'
+                    ? '#6366f1'
+                    : isGold ? c.goldSolid : '#3a78d4';
               const accentBorder = e.accent === 'purple'
                 ? 'rgba(168,85,247,0.35)'
                 : e.accent === 'teal'
                   ? 'rgba(20,184,166,0.35)'
-                  : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
+                  : e.accent === 'indigo'
+                    ? 'rgba(99,102,241,0.35)'
+                    : isGold ? c.goldLine : 'rgba(96,165,250,0.35)';
               return (
                 <motion.button
                   key={e.key}
