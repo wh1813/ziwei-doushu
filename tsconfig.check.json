@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": [],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "app/page.tsx",
+    "app/qimen/page.tsx",
+    "app/liuyao/page.tsx",
+    "app/api/qimen-chart/route.ts",
+    "app/api/qimen-interpret/route.ts",
+    "app/api/liuyao-chart/route.ts",
+    "app/api/liuyao-interpret/route.ts",
+    "lib/qimen/engine.ts",
+    "lib/qimen/remedy.ts",
+    "lib/qimen/history.ts",
+    "lib/liuyao/engine.ts",
+    "lib/liuyao/history.ts",
+    "lib/ziwei/lunar-javascript.d.ts",
+    "types/stubs.d.ts"
+  ]
+}

@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Probe routes
         run: |
-          for path in / /qimen /tianji /chart; do
+          for path in / /qimen /liuyao /tianji /chart; do
             code=$(curl -s -o /tmp/probe.html -w "%{http_code}" "$BASE_URL$path")
             echo "GET $path -> HTTP $code ($(wc -c < /tmp/probe.html) bytes)"
             if [ "$code" != "200" ]; then
@@ -147,6 +147,109 @@ jobs:
             echo "::warning::interpret 503 - AI provider key likely not set on Worker (chart path unaffected)"
           elif [ "$curl_rc" = "28" ] || [ "$code" = "000" ]; then
             echo "::warning::interpret SSE timed out after 180s - upstream free-model queuing latency (provider-side, chart path unaffected, not a deploy defect)"
+          else
+            echo "::error::unexpected status $code"
+            exit 1
+          fi
+
+      - name: Probe /liuyao page
+        run: |
+          code=$(curl -s -o /tmp/liuyao.html -w "%{http_code}" "$BASE_URL/liuyao")
+          echo "GET /liuyao -> HTTP $code ($(wc -c < /tmp/liuyao.html) bytes)"
+          if [ "$code" != "200" ]; then
+            echo "--- body ---"; cat /tmp/liuyao.html; echo; exit 1
+          fi
+          # 简单 grep：页面必须含「六爻 · 起卦解卦」标题
+          if ! grep -q "六爻 · 起卦解卦" /tmp/liuyao.html; then
+            echo "::error::liuyao page missing header"; head -100 /tmp/liuyao.html; exit 1
+          fi
+          echo "LIUYAO PAGE: PASS"
+
+      - name: Golden check /api/liuyao-chart (2024-09-15 申时, 求财, 男)
+        run: |
+          code=$(curl -s -o /tmp/ly_chart.json -w "%{http_code}" -X POST "$BASE_URL/api/liuyao-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2024-09-15","timeIndex":8,"questionType":"求财","questionGoal":"测试","method":"time","gender":"男"}')
+          echo "POST /api/liuyao-chart -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "--- error body ---"; cat /tmp/ly_chart.json; echo; exit 1
+          fi
+          python3 - <<'PY'
+          import json, sys
+          live = json.load(open("/tmp/ly_chart.json"))
+          chart = live.get("chart") or {}
+          ganzhi = live.get("ganzhi") or {}
+          yongshen = live.get("yongShen") or {}
+          yaos = chart.get("yaoList") or []
+          checks = [
+              ("benGua",                chart.get("benGua"),                              "乾为天"),
+              ("bianGua",               chart.get("bianGua"),                             "天火同人"),
+              ("guaGong",               chart.get("guaGong"),                             "乾宫"),
+              ("guaGongWuxing",         chart.get("guaGongWuxing"),                       "金"),
+              ("shiYaoIndex",           chart.get("shiYaoIndex"),                         6),
+              ("yingYaoIndex",          chart.get("yingYaoIndex"),                        3),
+              ("dongYaoIndices",        chart.get("dongYaoIndices"),                      [1]),
+              ("liuqinOfSelf",          chart.get("liuqinOfSelf"),                        "父母"),
+              ("dayGanzhi",             ganzhi.get("day"),                                "壬午"),
+              ("yongShen.name",         yongshen.get("name"),                             "妻财爻：甲寅（木）"),
+              ("yongShen.position",     yongshen.get("position"),                         2),
+              ("yaoList.length",        len(yaos),                                       6),
+              ("y1.position",           yaos[0].get("position") if len(yaos)>=1 else None, 1),
+              ("y6.position",           yaos[5].get("position") if len(yaos)>=6 else None, 6),
+              ("y1.isDong",             yaos[0].get("isDong") if len(yaos)>=1 else None,  True),
+              ("y2.liuqin",             yaos[1].get("liuqin") if len(yaos)>=2 else None, "妻财"),
+              ("y6.isShi",              yaos[5].get("isShi") if len(yaos)>=6 else None,  True),
+              ("y3.isYing",             yaos[2].get("isYing") if len(yaos)>=3 else None, True),
+              ("y1.liushou",            yaos[0].get("liushou") if len(yaos)>=1 else None,"青龙"),
+              ("y1.bianYinYang",        yaos[0].get("bianYinYang") if len(yaos)>=1 else None,"阴"),
+              ("y1.bianGan",            yaos[0].get("bianGan") if len(yaos)>=1 else None,"己"),
+              ("y1.bianZhi",            yaos[0].get("bianZhi") if len(yaos)>=1 else None,"卯"),
+              ("recordId.present",      bool(live.get("recordId")),                       True),
+          ]
+          fails = 0
+          for name, got, want in checks:
+              ok = got == want
+              print(("OK  " if ok else "FAIL") + f" {name}: live={got!r} expect={want!r}")
+              fails += 0 if ok else 1
+          if fails:
+              sys.exit(f"{fails} liuyao golden mismatches")
+          print("LIUYAO GOLDEN LIVE CHECK: ALL MATCH")
+          PY
+
+      - name: Validation check /api/liuyao-chart (bad input)
+        run: |
+          code=$(curl -s -o /tmp/ly_bad.json -w "%{http_code}" -X POST "$BASE_URL/api/liuyao-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"not-a-date","timeIndex":8,"method":"time"}')
+          echo "POST /api/liuyao-chart(bad date) -> HTTP $code"
+          if [ "$code" != "400" ]; then
+            echo "::error::expected 400 for bad date, got $code"; cat /tmp/ly_bad.json; exit 1
+          fi
+          echo "BAD-INPUT CHECK: PASS (HTTP 400)"
+
+      - name: Smoke test /api/liuyao-interpret (SSE)
+        run: |
+          set +e
+          # 先起卦拿 recordId
+          chart_json=$(curl -s -X POST "$BASE_URL/api/liuyao-chart" \
+            -H "Content-Type: application/json" \
+            -d '{"solarDate":"2024-09-15","timeIndex":8,"questionType":"求财","questionGoal":"测试","method":"time","gender":"男"}')
+          record_id=$(echo "$chart_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('recordId') or '')")
+          echo "Got recordId: ${record_id:-<none>}"
+          code=$(curl -s -o /tmp/ly_interp.txt -w "%{http_code}" --max-time 180 \
+            -X POST "$BASE_URL/api/liuyao-interpret" \
+            -H "Content-Type: application/json" \
+            -d "{\"solarDate\":\"2024-09-15\",\"timeIndex\":8,\"questionType\":\"求财\",\"questionGoal\":\"测试\",\"method\":\"time\",\"gender\":\"男\",\"recordId\":\"$record_id\"}")
+          curl_rc=$?
+          set -e
+          echo "POST /api/liuyao-interpret -> HTTP $code (curl rc=$curl_rc)"
+          head -c 300 /tmp/ly_interp.txt; echo
+          if [ "$code" = "200" ]; then
+            echo "liuyao interpret SSE OK"
+          elif [ "$code" = "503" ]; then
+            echo "::warning::liuyao interpret 503 - AI provider key likely not set on Worker (chart path unaffected)"
+          elif [ "$curl_rc" = "28" ] || [ "$code" = "000" ]; then
+            echo "::warning::liuyao interpret SSE timed out after 180s - upstream free-model queuing latency (provider-side, chart path unaffected, not a deploy defect)"
           else
             echo "::error::unexpected status $code"
             exit 1
