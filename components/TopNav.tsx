@@ -2,15 +2,19 @@
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useTheme } from './ThemeProvider';
+import { getSkin } from '@/lib/ui/theme';
 
 /**
  * 6 模块统一顶部导航：紫微排盘 / 手相 / 奇门 / 六爻 / 大六壬 / 小六壬 + 主题切换。
  * 各页面通过 import 共用，消除"页面长得一样"与"无法跨页跳转"两个体验问题。
+ *
+ * R18-9：皮肤色板改用 lib/ui/theme.ts（暗金鎏光统一 token），与首页保持一致。
  */
 export default function TopNav() {
   const router = useRouter();
   const { theme, toggle } = useTheme();
   const isDark = theme === 'dark';
+  const skin = getSkin(theme);
 
   const items = [
     { key: 'chart',       label: '紫微排盘', path: '/chart' },
@@ -21,12 +25,18 @@ export default function TopNav() {
     { key: 'xiaoliuren',  label: '小六壬',   path: '/xiaoliuren' },
   ];
 
-  // 主题色：dark 用半透明白底 + 金线，light 用金底白字
-  const navBg = isDark ? 'rgba(2, 8, 16, 0.85)' : 'rgba(245, 239, 224, 0.92)';
-  const navBorder = isDark ? 'rgba(212,168,67,0.25)' : 'rgba(140,100,20,0.30)';
-  const navText = isDark ? 'rgba(212,180,100,0.95)' : 'rgba(110,72,8,0.95)';
-  const toggleBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,252,242,0.95)';
-  const toggleBorder = isDark ? 'rgba(212,168,67,0.35)' : 'rgba(140,100,20,0.45)';
+  // 暗金鎏光导航条（暗色主题）/ 米金（亮色）
+  const navBg        = isDark ? 'rgba(11, 13, 19, 0.88)' : 'rgba(248, 243, 232, 0.94)';
+  const navBorder    = isDark ? 'rgba(212, 175, 55, 0.20)' : 'rgba(140, 100, 20, 0.25)';
+  const navText      = isDark ? skin.goldLight : '#7A5810';
+  const navItemBg    = 'transparent';
+  const navItemHover  = isDark ? 'rgba(212, 175, 55, 0.08)' : 'rgba(184, 144, 28, 0.08)';
+  const toggleBg     = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 252, 242, 0.95)';
+  const toggleBorder = isDark ? 'rgba(212, 175, 55, 0.35)' : 'rgba(140, 100, 20, 0.45)';
+  const toggleDot    = isDark
+    ? 'linear-gradient(135deg, #F5E6A3, #D4AF37)'
+    : 'linear-gradient(135deg, #B8901C, #F5E6A3)';
+  const toggleRail   = isDark ? 'rgba(11, 13, 19, 0.6)' : 'rgba(184, 144, 28, 0.55)';
 
   return (
     <nav
@@ -45,6 +55,8 @@ export default function TopNav() {
           border: `1px solid ${navBorder}`,
           background: 'transparent',
         }}
+        onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = navItemHover; }}
+        onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = navItemBg; }}
         aria-label="返回首页"
       >
         ← 首页
@@ -58,12 +70,15 @@ export default function TopNav() {
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => router.push(it.path)}
-            className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-full whitespace-nowrap transition-colors"
+            className="text-[10px] sm:text-xs px-2 sm:px-3 py-1 sm:py-1.5 rounded-full whitespace-nowrap"
             style={{
               color: navText,
               border: `1px solid ${navBorder}`,
               background: 'transparent',
+              fontFamily: skin.fontSerif,
             }}
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = navItemHover; }}
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { e.currentTarget.style.background = navItemBg; }}
           >
             {it.label}
           </motion.button>
@@ -81,19 +96,12 @@ export default function TopNav() {
         }}
         aria-label={isDark ? '切换亮色主题' : '切换暗色主题'}
       >
-        <div
-          className="relative w-7 h-3.5 rounded-full"
-          style={{
-            background: isDark ? 'rgba(12,24,64,0.95)' : 'rgba(230,195,80,0.55)',
-          }}
-        >
+        <div className="relative w-7 h-3.5 rounded-full" style={{ background: toggleRail }}>
           <div
             className="absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all duration-300"
             style={{
               left: isDark ? 2 : 14,
-              background: isDark
-                ? 'linear-gradient(135deg, #b8a050, #e8d090)'
-                : 'linear-gradient(135deg, #e89010, #f8d050)',
+              background: toggleDot,
             }}
           />
         </div>
