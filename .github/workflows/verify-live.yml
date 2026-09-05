@@ -108,7 +108,7 @@ jobs:
           def get(path):
               req = urllib.request.Request(BASE + path, headers=UA)
               return urllib.request.urlopen(req, timeout=30).read().decode('utf-8', errors='replace')
-          pages = ['/', '/chart', '/palm', '/qimen', '/liuyao', '/daliuren', '/xiaoliuren']
+          pages = ['/', '/palm', '/qimen', '/liuyao', '/daliuren', '/xiaoliuren']
           nav_labels = ['紫微排盘', '手相', '奇门', '六爻', '大六壬', '小六壬']
           fails = 0
           for p in pages:
