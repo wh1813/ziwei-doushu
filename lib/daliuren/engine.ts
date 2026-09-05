@@ -401,8 +401,8 @@ function deriveSanChuan(
     // 下 = xia.slice(0,1) 干 + xia.slice(1,2) 支
     // 下干所乘地支：需要查 dibanGan 反向——但 dibanGan[下支] 实际上是天盘干覆盖的干
     // 简化：取下支的寄宫作为初传地支
-    const chuZhi = siKe[idx].xia.slice(0, 1);
-    const chuGan = siKe[idx].xia.slice(-1);
+    const chuZhi = xiaZhiList[idx];
+    const chuGan = xiaGanList[idx];
     return deriveByZeiKe(idx, chuZhi, chuGan, siKe, true);
   }
 
