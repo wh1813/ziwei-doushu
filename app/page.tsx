@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import StarField from '@/components/StarField';
+import TopNav from '@/components/TopNav';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 
 // ─── 主题色彩 helper（沿用首页既有体系，仅保留核心色）────────────────────
@@ -26,55 +27,11 @@ function useColors(theme: Theme) {
     ctaBg:       d ? 'linear-gradient(135deg,#b8892a,#f0d070,#b8892a)'
                     : 'linear-gradient(135deg,#6a4206,#9a6810,#6a4206)',
     ctaText:     d ? '#08080a'                           : '#f8f3e8',
-    footerText:  d ? 'rgba(255,255,255,0.08)'            : '#c0a870',
+    footerText:  d ? 'rgba(212,180,110,0.55)'           : '#7a5a18',
     glowTint:    d ? 'rgba(212,168,67,0.07)'             : 'rgba(180,140,40,0.06)',
     glowBlue:    d ? 'rgba(40,80,160,0.12)'              : 'rgba(58,90,130,0.06)',
     glowPurple:  d ? 'rgba(120,50,180,0.08)'             : 'rgba(96,80,140,0.04)',
   };
-}
-
-// ─── 主题切换按钮（沿用原实现）─────────────────────────────
-function ThemeToggle() {
-  const { theme, toggle } = useTheme();
-  const isDark = theme === 'dark';
-  return (
-    <motion.button
-      onClick={toggle}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.93 }}
-      aria-label={isDark ? '切换亮色主题' : '切换暗色主题'}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-full border"
-      style={{
-        borderColor: isDark ? 'rgba(212,168,67,0.3)' : 'rgba(140,100,20,0.35)',
-        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,252,242,0.85)',
-        transition: 'background 0.35s ease, border-color 0.35s ease',
-      }}
-    >
-      <div className="relative w-10 h-5 rounded-full flex-shrink-0"
-        style={{
-          background: isDark ? 'rgba(12,24,64,0.95)' : 'rgba(230,195,80,0.55)',
-          transition: 'background 0.35s ease',
-        }}>
-        <motion.div
-          animate={{ x: isDark ? 2 : 22 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-          className="absolute top-1 w-3.5 h-3.5 rounded-full"
-          style={{
-            background: isDark
-              ? 'linear-gradient(135deg, #b8a050, #e8d090)'
-              : 'linear-gradient(135deg, #e89010, #f8d050)',
-          }}
-        />
-      </div>
-      <span className="text-[11px] font-medium tracking-wide select-none"
-        style={{
-          color: isDark ? 'rgba(212,180,100,0.85)' : 'rgba(110,72,8,0.8)',
-          transition: 'color 0.35s ease',
-        }}>
-        {isDark ? '暗色' : '亮色'}
-      </span>
-    </motion.button>
-  );
 }
 
 // ─── 主星数据（hero 点缀）─────────────────────────────────
@@ -177,55 +134,8 @@ export default function HomePage() {
           style={{ background: `radial-gradient(ellipse, ${c.glowPurple} 0%, transparent 70%)` }} />
       </div>
 
-      {/* ── 顶部导航 ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-end px-4 sm:px-8 py-3 sm:py-4 gap-2"
-        style={{ background: c.navBg }}>
-        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-          <ThemeToggle />
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/chart')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            紫微排盘
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/palm')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            手相
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/qimen')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            奇门
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/liuyao')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            六爻
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/daliuren')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            大六壬
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={() => router.push('/xiaoliuren')}
-            className="text-[11px] sm:text-xs px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full"
-            style={{ border: `1px solid ${c.goldLine}`, color: c.goldSolid }}>
-            小六壬
-          </motion.button>
-        </div>
-      </nav>
+      {/* ── 顶部导航（统一 TopNav 组件） ── */}
+      <TopNav />
 
       {/* ══ HERO ══ */}
       <section ref={heroRef} className="relative min-h-[86svh] flex flex-col items-center justify-center px-6 z-10 pt-16">
@@ -235,17 +145,14 @@ export default function HomePage() {
             transition={{ duration: 0.9, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}>
             <h1
               className={`grad-text ${theme === 'dark' ? 'grad-text-dark' : 'grad-text-light'} font-bold leading-none mb-6`}
-              style={{ fontSize: 'clamp(56px, 10vw, 124px)', letterSpacing: '0.07em' }}>
+              style={{
+                fontSize: 'clamp(56px, 11vw, 140px)',
+                letterSpacing: '0.07em',
+                textShadow: theme === 'dark' ? '0 0 40px rgba(240,208,112,0.35), 0 0 80px rgba(212,168,67,0.18)' : 'none',
+              }}>
               私人命理
             </h1>
           </motion.div>
-
-          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.45 }}
-            className="text-sm max-w-xl mx-auto leading-relaxed mb-12"
-            style={{ color: c.textMuted }}>
-            紫微排盘 · 手相分析 · 奇门遁甲 · 六爻起卦 · 大六壬起课 · 小六壬掌诀 — 简易操作，即刻解读
-          </motion.p>
 
           {/* 三大功能入口 */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}

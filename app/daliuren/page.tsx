@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import TopNav from "@/components/TopNav";
 
 const TIME_OPTIONS = [
   { value: 0, label: "早子时 00:00-01:00" },
@@ -175,12 +176,10 @@ export default function DaliurenPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
-      <div className="max-w-3xl mx-auto">
-        {/* 顶部导航 */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
-          <Link href="/" className="text-slate-400 hover:text-white text-sm flex items-center gap-1">
-            ← 返回首页
-          </Link>
+      <div className="max-w-3xl mx-auto pt-14">
+        <TopNav />
+        {/* 页面标题 */}
+        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b border-slate-800">
           <h1 className="text-xl font-bold tracking-wider text-indigo-400">大六壬 · 起课解课</h1>
           <div className="w-12"></div>
         </div>
