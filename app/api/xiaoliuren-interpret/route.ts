@@ -77,7 +77,7 @@ export async function POST(request: Request): Promise<Response> {
   const interpretRecordId = typeof recordId === 'string' && recordId.trim() ? recordId.trim() : null;
 
   // ── 第一步：要素校验（缺要素严禁强排）──
-  const validation = validateXiaoliurenInput({ solarDate, timeIndex });
+  const validation = validateXiaoliurenInput({ solarDate: typeof solarDate === "string" ? solarDate : String(solarDate), timeIndex: typeof timeIndex === "number" ? timeIndex : -1 });
   if (!validation.ok) return errorResponse(typeof validation.error === 'string' ? validation.error : '起课要素不合法', 400);
 
   const normalizedType = typeof questionType === 'string' ? questionType.trim().slice(0, 20) : '';
