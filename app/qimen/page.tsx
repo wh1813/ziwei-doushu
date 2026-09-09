@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
+import { useTheme } from "@/components/ThemeProvider";
+import { getSkin } from "@/lib/ui/theme";
 
 const TIME_OPTIONS = [
   { value: 0, label: "早子时 00:00-01:00" },
@@ -138,6 +140,18 @@ interface ChartUnfavorablePayload {
 }
 
 export default function QimenPage() {
+  const { theme } = useTheme();
+  const skin = getSkin(theme);
+
+  useLayoutEffect(() => {
+    document.documentElement.style.background = skin.bgBase;
+    document.body.style.background = skin.bgBase;
+    return () => {
+      document.documentElement.style.background = '';
+      document.body.style.background = '';
+    };
+  }, [skin.bgBase]);
+
   const [solarDate, setSolarDate] = useState("");
   const [timeIndex, setTimeIndex] = useState<number>(6);
   const [questionType, setQuestionType] = useState("事业");
@@ -291,11 +305,11 @@ export default function QimenPage() {
   const palaceMap = new Map<number, QimenPalace>((chart?.palaces ?? []).map((p) => [p.palace, p]));
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
+    <div className="min-h-screen text-slate-100 py-10 px-4" style={{ background: skin.bgInput }}>
       <div className="max-w-3xl mx-auto pt-14">
         <TopNav />
         {/* 页面标题 */}
-        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b border-slate-800">
+        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b" style={{ borderColor: skin.borderSubtle }}>
           <h1 className="text-xl font-bold tracking-wider text-emerald-400">奇门遁甲 · 起局解盘</h1>
           <div className="w-12"></div>
         </div>
@@ -332,7 +346,7 @@ export default function QimenPage() {
                 <span className="text-base font-bold text-emerald-300">帝王之学 · 洛书九宫</span>
                 <span className="text-[10px] text-amber-300/80 font-mono tracking-widest">JÌ MÉN DÙN JIǍ</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs leading-relaxed" style={{ color: skin.textSecond }}>
                 黄帝伐蚩尤，得玄女符箓于九宫洛书。阳遁九局、阴遁九局，合为十八局；天盘、地盘旋转叠合，八门、九星、八神各归其宫，以
                 <span className="text-emerald-300 font-semibold">值符值使</span>
                 为枢，<span className="text-amber-300 font-semibold">击刑入墓</span> 为忌。本局以时家奇门起盘，程序严判十八局、用神、格局、化解。
@@ -342,8 +356,8 @@ export default function QimenPage() {
         </div>
 
         {/* 输入表单 */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8 space-y-5">
-          <p className="text-xs text-slate-500 leading-relaxed">
+        <div className="border rounded-2xl p-6 shadow-xl mb-8 space-y-5" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
+          <p className="text-xs leading-relaxed" style={{ color: skin.textDim }}>
             本功能由程序先用 <span className="text-emerald-400">确定性算法严格起局</span>
             （阴阳遁、定局、天地盘干、九星、八门、八神、旬空、值符值使均为代码计算，非 AI 猜测），
             排盘确认后再交由 AI 依用神与格局解盘 —— <span className="text-emerald-400">先排盘，再解盘</span>。
@@ -351,25 +365,25 @@ export default function QimenPage() {
 
           {/* 起局日期 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">📅 起局日期（阳历，必填）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>📅 起局日期（阳历，必填）</label>
             <input
               type="date"
               value={solarDate}
               onChange={(e) => setSolarDate(e.target.value)}
               min="1900-01-01"
               max="2049-12-31"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             />
-            <p className="text-xs text-slate-500 mt-1">按北京时间起局；问事一般以当下时间起局</p>
+            <p className="text-xs mt-1" style={{ color: skin.textDim }}>按北京时间起局；问事一般以当下时间起局</p>
           </div>
 
           {/* 时辰 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">⏰ 起局时辰（必选）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>⏰ 起局时辰（必选）</label>
             <select
               value={timeIndex}
               onChange={(e) => setTimeIndex(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+              className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             >
               {TIME_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -379,7 +393,7 @@ export default function QimenPage() {
 
           {/* 出生信息（可选） */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>
               🎂 出生信息（可选 · 用于定位个人用神）
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -389,12 +403,12 @@ export default function QimenPage() {
                 onChange={(e) => setBirthDate(e.target.value)}
                 min="1900-01-01"
                 max="2049-12-31"
-                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
               />
               <select
                 value={birthTimeIndex === null ? "" : String(birthTimeIndex)}
                 onChange={(e) => setBirthTimeIndex(e.target.value === "" ? null : Number(e.target.value))}
-                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
               >
                 <option value="">时辰不详（按正午计）</option>
                 {TIME_OPTIONS.map((o) => (
@@ -402,7 +416,7 @@ export default function QimenPage() {
                 ))}
               </select>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs mt-1" style={{ color: skin.textDim }}>
               只需填写一次，本机自动记住（localStorage），此后起局无需再提供；
               系统将按出生八字锁定「本人 / 日干合神 / 生年天干」符号并检测击刑、入墓、空亡。
               起局时间始终为上方当前时间（一事一局），解盘时先纯盘面解读、再定位个人用神宫位
@@ -411,18 +425,17 @@ export default function QimenPage() {
 
           {/* 所问事项类型 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">🗂️ 所问事项类型</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>🗂️ 所问事项类型</label>
             <div className="flex flex-wrap gap-2">
               {QUESTION_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setQuestionType(t)}
-                  className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${
-                    questionType === t
-                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold"
-                      : "border-slate-700 hover:bg-slate-800 text-slate-400"
-                  }`}
+                  className="px-3.5 py-1.5 text-sm rounded-lg border transition-all"
+                  style={questionType === t
+                    ? { background: "rgba(212,175,55,0.12)", borderColor: skin.gold, color: skin.goldLight, fontWeight: 700 }
+                    : { borderColor: skin.border, color: skin.textMuted }}
                 >
                   {t}
                 </button>
@@ -432,14 +445,14 @@ export default function QimenPage() {
 
           {/* 具体问题 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">💬 具体想问的事（可选）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>💬 具体想问的事（可选）</label>
             <textarea
               value={questionGoal}
               onChange={(e) => setQuestionGoal(e.target.value)}
               placeholder="例如：这份工作要不要跳？这笔投资能不能进？官司能不能赢？"
               rows={3}
               maxLength={500}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none"
+              className="w-full border rounded-lg p-3 text-sm placeholder-slate-500 focus:outline-none focus:border-slate-500 resize-none" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             />
           </div>
 
@@ -453,11 +466,10 @@ export default function QimenPage() {
             type="button"
             onClick={() => handleCastChart()}
             disabled={loadingChart || !solarDate}
-            className={`w-full py-3.5 rounded-xl font-bold text-base transition-all ${
-              loadingChart || !solarDate
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20"
-            }`}
+            className="w-full py-3.5 rounded-xl font-bold text-base transition-all"
+            style={loadingChart || !solarDate
+              ? { background: skin.bgElevated, color: skin.textDim, cursor: "not-allowed" }
+              : { background: skin.gold, color: skin.textOnGold, boxShadow: "0 10px 15px -3px rgba(212,175,55,0.25)" }}
           >
             {loadingChart ? "正在起局排盘…" : "第一步 · 起局排盘"}
           </button>
@@ -465,40 +477,40 @@ export default function QimenPage() {
 
         {/* 排盘结果：信息栏 + 九宫格 */}
         {chartData && chart && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8">
+          <div className="border rounded-2xl p-6 shadow-xl mb-8" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className="text-lg font-bold text-emerald-400">
                 {chart.dunType}{chart.juNumber}局
               </span>
-              <span className="text-xs text-slate-400">{chart.yuan}</span>
-              <span className="text-xs text-slate-500">·</span>
-              <span className="text-xs text-slate-400">节令 {chart.activeJie}</span>
-              <span className="text-xs text-slate-500">·</span>
-              <span className="text-xs text-slate-400">旬首 {chart.xunshou}（遁{chart.hiddenYi}）</span>
-              <span className="text-xs text-slate-500">·</span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs" style={{ color: skin.textMuted }}>{chart.yuan}</span>
+              <span className="text-xs" style={{ color: skin.textDim }}>·</span>
+              <span className="text-xs" style={{ color: skin.textMuted }}>节令 {chart.activeJie}</span>
+              <span className="text-xs" style={{ color: skin.textDim }}>·</span>
+              <span className="text-xs" style={{ color: skin.textMuted }}>旬首 {chart.xunshou}（遁{chart.hiddenYi}）</span>
+              <span className="text-xs" style={{ color: skin.textDim }}>·</span>
+              <span className="text-xs" style={{ color: skin.textMuted }}>
                 值符 {chart.zhifu.star}·{chart.zhifu.palace}宫
               </span>
-              <span className="text-xs text-slate-500">·</span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs" style={{ color: skin.textDim }}>·</span>
+              <span className="text-xs" style={{ color: skin.textMuted }}>
                 值使 {chart.zhishi.door}·{chart.zhishi.palace}宫
               </span>
             </div>
 
-            <div className="text-xs text-slate-400 mb-1">
+            <div className="text-xs mb-1" style={{ color: skin.textMuted }}>
               公历 {chartData.input.solarDate} · 干支 {chartData.ganzhi.year}年 {chartData.ganzhi.month}月 {chartData.ganzhi.day}日 {chartData.ganzhi.time}时
-              <span className="text-slate-600"> （农历{chartData.lunar.isLeapMonth ? "闰" : ""}{chartData.lunar.monthText}月{chartData.lunar.dayText}）</span>
+              <span style={{ color: skin.textDim }}> （农历{chartData.lunar.isLeapMonth ? "闰" : ""}{chartData.lunar.monthText}月{chartData.lunar.dayText}）</span>
             </div>
-            <div className="text-xs text-slate-400 mb-1">
-              时空亡 <span className="text-amber-400">{chart.kongwang.join("")}</span>（{chart.kongwangPalaces.join("、") || "无"}宫）
-              <span className="text-slate-600"> · </span>
-              日空亡 <span className="text-amber-400">{chart.dayKongwang.join("")}</span>（{chart.dayKongwangPalaces.join("、") || "无"}宫）
-              <span className="text-slate-600"> · </span>
+            <div className="text-xs mb-1" style={{ color: skin.textMuted }}>
+              时空亡 <span style={{ color: skin.gold }}>{chart.kongwang.join("")}</span>（{chart.kongwangPalaces.join("、") || "无"}宫）
+              <span style={{ color: skin.textDim }}> · </span>
+              日空亡 <span style={{ color: skin.gold }}>{chart.dayKongwang.join("")}</span>（{chart.dayKongwangPalaces.join("、") || "无"}宫）
+              <span style={{ color: skin.textDim }}> · </span>
               驿马 <span className="text-sky-400">{chart.yima.branch ?? "无"}</span>（{chart.yima.palace ?? "-"}宫）
             </div>
-            <div className="text-xs text-slate-400 mb-4">
+            <div className="text-xs mb-4" style={{ color: skin.textMuted }}>
               日干（求测人）<span className="text-emerald-300">{chart.dayStem.stem}</span> 落 {chart.dayStem.palace ?? "-"} 宫
-              <span className="text-slate-600"> · </span>
+              <span style={{ color: skin.textDim }}> · </span>
               时干（所问之事）<span className="text-emerald-300">{chart.timeStemVisible}</span> 落 {chart.timePalace} 宫
             </div>
 
@@ -518,21 +530,21 @@ export default function QimenPage() {
                         : "border-slate-700 bg-slate-950"
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                    <div className="flex items-center justify-between text-[10px] mb-1" style={{ color: skin.textDim }}>
                       <span>{p.name}·{p.direction}</span>
                       <span>{no}</span>
                     </div>
 
                     {p.isCenter ? (
                       <div className="py-2">
-                        <div className="text-sm text-slate-400">天禽（寄坤）</div>
-                        <div className="text-[10px] text-slate-600 mt-0.5">{p.earthStem}</div>
+                        <div className="text-sm" style={{ color: skin.textMuted }}>天禽（寄坤）</div>
+                        <div className="text-[10px] mt-0.5" style={{ color: skin.textDim }}>{p.earthStem}</div>
                       </div>
                     ) : (
                       <>
                         <div className="text-xl font-bold text-emerald-300 leading-tight">{p.skyStem}</div>
-                        <div className="text-sm text-slate-500 leading-tight">{p.earthStem}</div>
-                        <div className="text-xs text-slate-300 mt-1.5">{p.star}</div>
+                        <div className="text-sm leading-tight" style={{ color: skin.textDim }}>{p.earthStem}</div>
+                        <div className="text-xs mt-1.5" style={{ color: skin.textSecond }}>{p.star}</div>
                         <div className="text-xs text-amber-300">{p.door}</div>
                         <div className="text-[11px] text-purple-300">{p.god}</div>
                       </>
@@ -540,10 +552,10 @@ export default function QimenPage() {
 
                     <div className="flex flex-wrap justify-center gap-1 mt-1.5">
                       {p.hostingNote && (
-                        <span className="text-[9px] px-1 rounded bg-slate-800 text-slate-400">寄坤</span>
+                        <span className="text-[9px] px-1 rounded bg-slate-800" style={{ color: skin.textMuted }}>寄坤</span>
                       )}
                       {isKong && (
-                        <span className="text-[9px] px-1 rounded bg-amber-950 text-amber-400">空亡</span>
+                        <span className="text-[9px] px-1 rounded bg-amber-950" style={{ color: skin.gold }}>空亡</span>
                       )}
                       {isYima && (
                         <span className="text-[9px] px-1 rounded bg-sky-950 text-sky-400">马星</span>
@@ -569,7 +581,7 @@ export default function QimenPage() {
             {/* 格局 */}
             {chart.detectedPatterns.length > 0 && (
               <div className="mt-4">
-                <div className="text-xs text-slate-500 mb-1.5">命中格局</div>
+                <div className="text-xs mb-1.5" style={{ color: skin.textDim }}>命中格局</div>
                 <div className="flex flex-wrap gap-2">
                   {chart.detectedPatterns.map((pat, i) => (
                     <span
@@ -599,7 +611,7 @@ export default function QimenPage() {
             {chartData.chartUnfavorable &&
              (chartData.chartUnfavorable.jiXing.length > 0 || chartData.chartUnfavorable.ruMu.length > 0) && (
               <div className="mt-4 space-y-1">
-                <div className="text-xs text-slate-500">全盘不利状态（解局依据）</div>
+                <div className="text-xs" style={{ color: skin.textDim }}>全盘不利状态（解局依据）</div>
                 {chartData.chartUnfavorable.jiXing.map((it, i) => (
                   <div key={`jx${i}`} className="text-[11px] text-red-300 leading-relaxed">
                     · 击刑｜第{it.palace}宫{it.palaceName}（{it.direction}）天盘{it.skyStem} —— {it.reason}
@@ -616,10 +628,10 @@ export default function QimenPage() {
             {/* 个人用神定位（提供出生信息时展示） */}
             {chartData.personal && (
               <div className="mt-4 p-3 border border-purple-900/60 bg-purple-950/20 rounded-lg space-y-3">
-                <div className="text-xs text-slate-400">
+                <div className="text-xs" style={{ color: skin.textMuted }}>
                   个人用神定位 · 出生 {chartData.personal.birth.date}
                   {chartData.personal.birth.hourLabel ? ` ${chartData.personal.birth.hourLabel}` : ""}
-                  <span className="text-slate-600">
+                  <span style={{ color: skin.textDim }}>
                     {" "}· 八字日柱 {chartData.personal.baZi.dayGanZhi} · 生年 {chartData.personal.baZi.yearGanZhi}
                   </span>
                 </div>
@@ -629,9 +641,9 @@ export default function QimenPage() {
                   chartData.personal.yearSymbol,
                 ].map((sym, i) => (
                   <div key={i} className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">{sym.role}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-slate-800" style={{ color: skin.textSecond }}>{sym.role}</span>
                     <span className="font-bold text-purple-300">{sym.displaySymbol}</span>
-                    <span className="text-slate-400">
+                    <span style={{ color: skin.textMuted }}>
                       落 {sym.palaceName ?? "?"}（{sym.direction ?? "?"}·第{sym.palace ?? "?"}宫·{sym.onPlate}）
                     </span>
                     {(sym.states.jiXing || sym.states.ruMu || sym.states.kongWangShi || sym.states.kongWangRi ? [
@@ -641,12 +653,12 @@ export default function QimenPage() {
                     ] : [{ label: "平安", cls: "bg-emerald-950 text-emerald-300" }]).map((t, j) => (
                       <span key={j} className={`text-[9px] px-1 rounded ${t.cls}`}>{t.label}</span>
                     ))}
-                    {sym.note && <span className="text-slate-600 w-full">{sym.note}</span>}
+                    {sym.note && <span className="w-full" style={{ color: skin.textDim }}>{sym.note}</span>}
                   </div>
                 ))}
                 <div className="space-y-1">
                   {chartData.personal.facts.map((f, i) => (
-                    <div key={i} className="text-[11px] text-slate-300 leading-relaxed">· {f}</div>
+                    <div key={i} className="text-[11px] leading-relaxed" style={{ color: skin.textSecond }}>· {f}</div>
                   ))}
                 </div>
                 {chartData.personal.remedyHints.length > 0 && (
@@ -686,18 +698,18 @@ export default function QimenPage() {
 
         {/* 解盘结果 */}
         {answer && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+          <div className="border rounded-2xl p-6 shadow-2xl" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: skin.gold }}>
               <span>📖</span> 奇门鉴析
             </h2>
-            <div className="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">
+            <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: skin.textPrimary }}>
               {answer}
               {interpretLoading && <span className="inline-block w-2 h-4 ml-1 bg-amber-400 animate-pulse align-middle" />}
             </div>
           </div>
         )}
 
-        <p className="text-[11px] text-slate-600 text-center mt-8">
+        <p className="text-[11px] text-center mt-8" style={{ color: skin.textDim }}>
           盘面仅呈现特定时空的趋势信息，事在人为 · 仅供娱乐参考，不做医疗、投资等决策依据
         </p>
       </div>
