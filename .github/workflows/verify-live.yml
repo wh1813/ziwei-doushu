@@ -258,31 +258,51 @@ jobs:
           ganzhi = live.get("ganzhi") or {}
           yongshen = live.get("yongShen") or {}
           yaos = chart.get("yaoList") or []
+          analysis = live.get("analysis") or {}
+          five = analysis.get("fiveShen") or {}
+          yaoana = analysis.get("yaoAnalysis") or []
           checks = [
-              ("benGua",                chart.get("benGua"),                              "乾为天"),
-              ("bianGua",               chart.get("bianGua"),                             "天火同人"),
-              ("guaGong",               chart.get("guaGong"),                             "乾宫"),
-              ("guaGongWuxing",         chart.get("guaGongWuxing"),                       "金"),
+              ("benGua",                chart.get("benGua"),                              "离为火"),
+              ("bianGua",               chart.get("bianGua"),                             "火雷噬嗑"),
+              ("guaGong",               chart.get("guaGong"),                             "离宫"),
+              ("guaGongWuxing",         chart.get("guaGongWuxing"),                       "火"),
               ("shiYaoIndex",           chart.get("shiYaoIndex"),                         6),
               ("yingYaoIndex",          chart.get("yingYaoIndex"),                        3),
-              ("dongYaoIndices",        chart.get("dongYaoIndices"),                      [1]),
-              ("liuqinOfSelf",          chart.get("liuqinOfSelf"),                        "父母"),
+              ("dongYaoIndices",        chart.get("dongYaoIndices"),                      [3]),
+              ("liuqinOfSelf",          chart.get("liuqinOfSelf"),                        "兄弟"),
               ("dayGanzhi",             ganzhi.get("day"),                                "壬午"),
-              ("yongShen.name",         yongshen.get("name"),                             "妻财爻：甲寅（木）"),
-              ("yongShen.position",     yongshen.get("position"),                         2),
+              ("timeGanzhi",            ganzhi.get("time"),                               "戊申"),
+              ("yongShen.name",         yongshen.get("name"),                             "妻财爻：己酉（金）"),
+              ("yongShen.position",     yongshen.get("position"),                         4),
               ("yaoList.length",        len(yaos),                                       6),
               ("y1.position",           yaos[0].get("position") if len(yaos)>=1 else None, 1),
               ("y6.position",           yaos[5].get("position") if len(yaos)>=6 else None, 6),
-              ("y1.isDong",             yaos[0].get("isDong") if len(yaos)>=1 else None,  True),
-              ("y2.liuqin",             yaos[1].get("liuqin") if len(yaos)>=2 else None, "妻财"),
+              ("y1.isDong",             yaos[0].get("isDong") if len(yaos)>=1 else None, False),
+              ("y3.isDong",             yaos[2].get("isDong") if len(yaos)>=3 else None, True),
+              ("y2.liuqin",             yaos[1].get("liuqin") if len(yaos)>=2 else None, "子孙"),
+              ("y4.liuqin",             yaos[3].get("liuqin") if len(yaos)>=4 else None, "妻财"),
               ("y6.isShi",              yaos[5].get("isShi") if len(yaos)>=6 else None,  True),
               ("y3.isYing",             yaos[2].get("isYing") if len(yaos)>=3 else None, True),
               ("y1.liushou",            yaos[0].get("liushou") if len(yaos)>=1 else None,"青龙"),
-              ("y1.bianYinYang",        yaos[0].get("bianYinYang") if len(yaos)>=1 else None,"阴"),
-              ("y1.bianGan",            yaos[0].get("bianGan") if len(yaos)>=1 else None,"己"),
-              ("y1.bianZhi",            yaos[0].get("bianZhi") if len(yaos)>=1 else None,"卯"),
+              ("y3.bianYinYang",        yaos[2].get("bianYinYang") if len(yaos)>=3 else None,"阴"),
+              ("y3.bianGan",            yaos[2].get("bianGan") if len(yaos)>=3 else None,"庚"),
+              ("y3.bianZhi",            yaos[2].get("bianZhi") if len(yaos)>=3 else None,"辰"),
+              # R18-10 深度分析：旺衰 / 五神 / 间爻 / 月破
+              ("analysis.yaoAnalysis.len", len(yaoana),                                  6),
+              ("fiveShen.yongShen",     five.get("yongShen"),                             "妻财"),
+              ("fiveShen.yuanShen",     five.get("yuanShen"),                             "子孙"),
+              ("fiveShen.jiShen",       five.get("jiShen"),                               "兄弟"),
+              ("analysis.jianYao",      analysis.get("jianYao"),                          [4, 5]),
+              ("y1.monthPower",         yaoana[0].get("monthPower") if len(yaoana)>=1 else None, "死"),
+              ("y1.isMonthBreak",       yaoana[0].get("isMonthBreak") if len(yaoana)>=1 else None, True),
           ]
           fails = 0
+          # 应期候选为动态推导，只校验非空
+          if not (analysis.get("timings") or []):
+              print("FAIL analysis.timings: 应期候选为空")
+              fails += 1
+          else:
+              print(f"OK   analysis.timings: {len(analysis['timings'])} 条候选")
           for name, got, want in checks:
               ok = got == want
               print(("OK  " if ok else "FAIL") + f" {name}: live={got!r} expect={want!r}")

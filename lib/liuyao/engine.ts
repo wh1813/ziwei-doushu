@@ -21,13 +21,15 @@
  */
 
 import { Solar } from 'lunar-javascript';
+import { analyzeLiuyao, type AnalysisResult } from './analysis';
 
 // ─── 八经卦基本参数（京房纳甲体系）────────────────
 
 /** 八卦纳甲表（爻位由下而上 1-6） */
 const NAI_JIA_TABLE: Record<string, { gan: string[]; zhi: string[] }> = {
-  乾: { gan: ['甲', '甲', '壬', '壬', '壬', '壬'], zhi: ['子', '寅', '辰', '午', '申', '戌'] },
-  坤: { gan: ['乙', '乙', '癸', '癸', '癸', '癸'], zhi: ['未', '巳', '卯', '丑', '亥', '酉'] },
+  // 天干：内卦三爻与外卦三爻各纳一干（乾内甲外壬、坤内乙外癸；其余六卦内外同干）
+  乾: { gan: ['甲', '甲', '甲', '壬', '壬', '壬'], zhi: ['子', '寅', '辰', '午', '申', '戌'] },
+  坤: { gan: ['乙', '乙', '乙', '癸', '癸', '癸'], zhi: ['未', '巳', '卯', '丑', '亥', '酉'] },
   震: { gan: ['庚', '庚', '庚', '庚', '庚', '庚'], zhi: ['子', '寅', '辰', '午', '申', '戌'] },
   巽: { gan: ['辛', '辛', '辛', '辛', '辛', '辛'], zhi: ['丑', '亥', '酉', '未', '巳', '卯'] },
   坎: { gan: ['戊', '戊', '戊', '戊', '戊', '戊'], zhi: ['寅', '辰', '午', '申', '戌', '子'] },
@@ -75,10 +77,36 @@ const WUXING_KE: Record<string, string> = { 木: '土', 土: '水', 水: '火', 
 const LIUSHOU = ['青龙', '朱雀', '勾陈', '螣蛇', '白虎', '玄武'] as const;
 type Liushou = (typeof LIUSHOU)[number];
 
-/** 卦名（共 64 卦：本卦与变卦都用卦象→名查表） */
+/**
+ * 经卦位图 → 卦名。
+ *
+ * 位序约定：bits 为「上爻、中爻、下爻」三字符（与 trigramsFromYaos 产出一致）。
+ * 八卦爻形（自下而上 1=阳）：乾111 兑110 离101 震100 巽011 坎010 艮001 坤000，
+ * 反转为「上中下」序即下表。位序搞错会使 8 个经卦中 6 个判错，进而连累卦名、
+ * 卦宫、世爻与六亲，故以注释固定约定。
+ */
 const TRIGRAM_NAMES: Record<string, string> = {
-  '111': '乾', '000': '坤', '100': '震', '010': '巽', '001': '坎', '110': '离', '011': '艮', '101': '兑',
+  '111': '乾', '011': '兑', '101': '离', '001': '震',
+  '110': '巽', '010': '坎', '100': '艮', '000': '坤',
 };
+
+/**
+ * 先天八卦数（1-8）→ 经卦位图（「上中下」序，与 TRIGRAM_NAMES 同序）。
+ * 用于时间起卦 / 数字起卦：卦数须整体映射为一个经卦三爻，
+ * 不可用卦数奇偶逐爻填充（那样只能产出乾/坤两种卦）。
+ */
+const XIANTIAN_BITS: string[] = ['', '111', '011', '101', '001', '110', '010', '100', '000'];
+
+/** 由上下卦数（1-8，先天数）生成 6 爻阴阳（自下而上） */
+function yaosFromGuaNumbers(upperNum: number, lowerNum: number): boolean[] {
+  const up = XIANTIAN_BITS[upperNum] || '000';
+  const lo = XIANTIAN_BITS[lowerNum] || '000';
+  // bits=[上,中,下]；下卦取初/二/三爻 = lo[2]/lo[1]/lo[0]，上卦取四/五/六爻同理
+  return [
+    lo[2] === '1', lo[1] === '1', lo[0] === '1',
+    up[2] === '1', up[1] === '1', up[0] === '1',
+  ];
+}
 
 /** 64 卦全名（按上下卦组合 → 卦名） */
 const HEXAGRAM_NAMES: Record<string, string> = {
@@ -164,8 +192,10 @@ export interface LiuyaoFullResult {
     reason: string;           // 推算理由
     position: number | null;  // 用神所在爻位（1-6）；无动爻命中时 null
   };
-  /** 命中格局（空亡、月破、六合、六冲、三刑 等） */
+  /** 命中格局（空亡、月破、六合、六冲、三刑、进退神、回头生克 等） */
   detectedPatterns: Array<{ name: string; nature: '吉' | '凶' | '中性'; note: string }>;
+  /** 深度分析（旺衰 / 日辰作用 / 五神 / 伏神 / 应期 / 间爻） */
+  analysis: AnalysisResult;
   warnings: string[];         // 边界提醒
 }
 
@@ -204,30 +234,17 @@ function yaosFromTime(solar: Solar): { yaos: boolean[]; dongIndices: number[] } 
   const lowerNum = (yearZhiIdx + monthZhiIdx + dayZhiIdx + timeZhiIdx) % 8 || 8;
   const dongNum = (yearZhiIdx + monthZhiIdx + dayZhiIdx + timeZhiIdx) % 6 || 6;
 
-  const yaos: boolean[] = [];
-  for (let i = 0; i < 6; i++) {
-    // 第 i 爻阴阳：上下卦由地支数得到
-    const isUpperYao = i >= 3;
-    const num = isUpperYao ? upperNum : lowerNum;
-    // 阳爻：1/3/5/7；阴爻：2/4/6/8
-    yaos.push(num % 2 === 1);
-  }
-  return { yaos, dongIndices: [dongNum] };
+  return { yaos: yaosFromGuaNumbers(upperNum, lowerNum), dongIndices: [dongNum] };
 }
 
 /** 数字起卦（如 123 → 上下卦 1+2+3=6，1+2+3=6，动爻 6） */
 function yaosFromNumber(a: number, b: number): { yaos: boolean[]; dongIndices: number[] } {
   const total = a + b;
   const upperNum = total % 8 || 8;
-  const lowerNum = total % 8 || 8;
-  const dongNum = (a % 6) || 6;
-  const yaos: boolean[] = [];
-  for (let i = 0; i < 6; i++) {
-    const isUpperYao = i >= 3;
-    const num = isUpperYao ? upperNum : lowerNum;
-    yaos.push(num % 2 === 1);
-  }
-  return { yaos, dongIndices: [dongNum] };
+  // 下卦取两数之与时辰之外的独立来源：上卦用和、下卦用首数，避免上下卦恒等
+  const lowerNum = (a % 8) || 8;
+  const dongNum = (total % 6) || 6;
+  return { yaos: yaosFromGuaNumbers(upperNum, lowerNum), dongIndices: [dongNum] };
 }
 
 const ZHI_LIST = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
@@ -237,64 +254,82 @@ function getZhiIndex(zhi: string): number {
 }
 
 /** 由卦象查所属宫（简化版：八纯卦各归本宫，64 卦其余用京房八宫世应定位） */
+/**
+ * 京房八宫六十四卦归属表（卦名 → 宫名）。
+ *
+ * 八宫各领八卦：本宫纯卦(世在六) → 一世至五世(世在一至五) → 游魂(世在四) → 归魂(世在六/三)。
+ * 卦宫五行决定该卦全部六爻的六亲，是排盘正确性的地基——宫判错则六亲全错。
+ *
+ * 顺序（每宫 8 卦）：纯卦、一世、二世、三世、四世、五世、游魂、归魂
+ */
+export const GONG_TABLE: Record<string, { gong: string; shi: number }> = {
+  // 乾宫（金）
+  '乾为天': { gong: '乾宫', shi: 6 }, '天风姤': { gong: '乾宫', shi: 1 },
+  '天山遁': { gong: '乾宫', shi: 2 }, '天地否': { gong: '乾宫', shi: 3 },
+  '风地观': { gong: '乾宫', shi: 4 }, '山地剥': { gong: '乾宫', shi: 5 },
+  '火地晋': { gong: '乾宫', shi: 4 }, '火天大有': { gong: '乾宫', shi: 3 },
+  // 兑宫（金）
+  '兑为泽': { gong: '兑宫', shi: 6 }, '泽水困': { gong: '兑宫', shi: 1 },
+  '泽地萃': { gong: '兑宫', shi: 2 }, '泽山咸': { gong: '兑宫', shi: 3 },
+  '水山蹇': { gong: '兑宫', shi: 4 }, '地山谦': { gong: '兑宫', shi: 5 },
+  '雷山小过': { gong: '兑宫', shi: 4 }, '雷泽归妹': { gong: '兑宫', shi: 3 },
+  // 离宫（火）
+  '离为火': { gong: '离宫', shi: 6 }, '火山旅': { gong: '离宫', shi: 1 },
+  '火风鼎': { gong: '离宫', shi: 2 }, '火水未济': { gong: '离宫', shi: 3 },
+  '山水蒙': { gong: '离宫', shi: 4 }, '风水涣': { gong: '离宫', shi: 5 },
+  '天水讼': { gong: '离宫', shi: 4 }, '天火同人': { gong: '离宫', shi: 3 },
+  // 震宫（木）
+  '震为雷': { gong: '震宫', shi: 6 }, '雷地豫': { gong: '震宫', shi: 1 },
+  '雷水解': { gong: '震宫', shi: 2 }, '雷风恒': { gong: '震宫', shi: 3 },
+  '地风升': { gong: '震宫', shi: 4 }, '水风井': { gong: '震宫', shi: 5 },
+  '泽风大过': { gong: '震宫', shi: 4 }, '泽雷随': { gong: '震宫', shi: 3 },
+  // 巽宫（木）
+  '巽为风': { gong: '巽宫', shi: 6 }, '风天小畜': { gong: '巽宫', shi: 1 },
+  '风火家人': { gong: '巽宫', shi: 2 }, '风雷益': { gong: '巽宫', shi: 3 },
+  '天雷无妄': { gong: '巽宫', shi: 4 }, '火雷噬嗑': { gong: '巽宫', shi: 5 },
+  '山雷颐': { gong: '巽宫', shi: 4 }, '山风蛊': { gong: '巽宫', shi: 3 },
+  // 坎宫（水）
+  '坎为水': { gong: '坎宫', shi: 6 }, '水泽节': { gong: '坎宫', shi: 1 },
+  '水雷屯': { gong: '坎宫', shi: 2 }, '水火既济': { gong: '坎宫', shi: 3 },
+  '泽火革': { gong: '坎宫', shi: 4 }, '雷火丰': { gong: '坎宫', shi: 5 },
+  '地火明夷': { gong: '坎宫', shi: 4 }, '地水师': { gong: '坎宫', shi: 3 },
+  // 艮宫（土）
+  '艮为山': { gong: '艮宫', shi: 6 }, '山火贲': { gong: '艮宫', shi: 1 },
+  '山天大畜': { gong: '艮宫', shi: 2 }, '山泽损': { gong: '艮宫', shi: 3 },
+  '火泽睽': { gong: '艮宫', shi: 4 }, '天泽履': { gong: '艮宫', shi: 5 },
+  '风泽中孚': { gong: '艮宫', shi: 4 }, '风山渐': { gong: '艮宫', shi: 3 },
+  // 坤宫（土）
+  '坤为地': { gong: '坤宫', shi: 6 }, '地雷复': { gong: '坤宫', shi: 1 },
+  '地泽临': { gong: '坤宫', shi: 2 }, '地天泰': { gong: '坤宫', shi: 3 },
+  '雷天大壮': { gong: '坤宫', shi: 4 }, '泽天夬': { gong: '坤宫', shi: 5 },
+  '水天需': { gong: '坤宫', shi: 4 }, '水地比': { gong: '坤宫', shi: 3 },
+};
+
+/** 卦名 → 宫名（由 GONG_TABLE 派生，避免宫表与世爻表两处维护不一致） */
+export const HEX_GONG_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(GONG_TABLE).map(([k, v]) => [k, v.gong]),
+);
+
+/** 八宫五行（卦宫五行决定六亲，非卦象五行） */
+export const GONG_WUXING: Record<string, string> = {
+  乾宫: '金', 兑宫: '金',
+  离宫: '火',
+  震宫: '木', 巽宫: '木',
+  坎宫: '水',
+  艮宫: '土', 坤宫: '土',
+};
+
 function guaGongByName(hexName: string): string {
-  const eightGong: Record<string, string> = {
-    '乾为天': '乾宫', '坤为地': '坤宫',
-    '震为雷': '震宫', '巽为风': '巽宫',
-    '坎为水': '坎宫', '离为火': '离宫',
-    '艮为山': '艮宫', '兑为泽': '兑宫',
-  };
-  for (const [k, v] of Object.entries(eightGong)) {
-    if (hexName === k) return v;
-  }
-  // 简化：非八纯卦归"游魂/归魂"——本引擎保守起见，标"杂卦"
-  return '杂卦';
+  return HEX_GONG_MAP[hexName] || '杂卦';
 }
 
-/** 世爻位置（按八宫世爻定位，本卦为某宫第几卦决定） */
-function shiYaoPosition(gong: string, hexName: string): number {
-  // 八纯卦世在六爻；其它按京房八宫游魂归魂序列
-  // 简化版：六爻安世法——
-  //  乾宫八卦世爻位：乾为天6、天风姤1、天山遁2、天地否3、风地观4、山地剥5、火地晋4(游魂)、火天大有6(归魂)
-  // 其它七宫类同，列出常用 8 宫
-  const SHI_YAO_MAP: Record<string, Record<string, number>> = {
-    乾宫: {
-      '乾为天': 6, '天风姤': 1, '天山遁': 2, '天地否': 3,
-      '风地观': 4, '山地剥': 5, '火地晋': 4, '火天大有': 6,
-    },
-    坤宫: {
-      '坤为地': 6, '地雷复': 1, '地泽临': 2, '地天泰': 3,
-      '雷天大壮': 4, '泽天夬': 5, '水天需': 4, '水地比': 6,
-    },
-    震宫: {
-      '震为雷': 6, '雷地豫': 1, '雷水解': 2, '雷风恒': 3,
-      '地风升': 4, '水风井': 5, '泽风大过': 4, '泽雷随': 6,
-    },
-    巽宫: {
-      '巽为风': 6, '风天小畜': 1, '风火家人': 2, '风雷益': 3,
-      '天雷无妄': 4, '火雷噬嗑': 5, '山雷颐': 4, '山风蛊': 6,
-    },
-    坎宫: {
-      '坎为水': 6, '水泽节': 1, '水雷屯': 2, '水火既济': 3,
-      '泽火革': 4, '雷火丰': 5, '地火明夷': 4, '地水师': 6,
-    },
-    离宫: {
-      '离为火': 6, '火山旅': 1, '火风鼎': 2, '火水未济': 3,
-      '山水蒙': 4, '风水涣': 5, '天水讼': 4, '天火同人': 6,
-    },
-    艮宫: {
-      '艮为山': 6, '山火贲': 1, '山天大畜': 2, '山泽损': 3,
-      '火泽睽': 4, '天泽履': 5, '风泽中孚': 4, '风山渐': 6,
-    },
-    兑宫: {
-      '兑为泽': 6, '泽水困': 1, '泽地萃': 2, '泽山咸': 3,
-      '水山蹇': 4, '地山谦': 5, '雷山小过': 4, '雷泽归妹': 6,
-    },
-  };
-  const map = SHI_YAO_MAP[gong];
-  if (map && hexName in map) return map[hexName];
-  // 兜底（杂卦）：默认世 3
-  return 3;
+/**
+ * 世爻位置（京房八宫安世法）。
+ * 本宫纯卦世在六；一世至五世依次在初至五；游魂世在四；归魂世在三。
+ * 单一真相源为 GONG_TABLE，此处不另立世爻表，避免两表不一致。
+ */
+function shiYaoPosition(hexName: string): number {
+  return GONG_TABLE[hexName]?.shi ?? 3;
 }
 
 /** 应爻位置：与世爻相隔两爻（世 1→应 4、6→应 3 等） */
@@ -367,19 +402,38 @@ function yongShenForQuestion(
   return { name: map[liuqinOfShi], reason: '未明确问事项，按卦主六亲作为用神主轴' };
 }
 
-/** 检测空亡：日柱旬中地支不现（与奇门同源） */
-const XUN_KONG: Record<string, string[]> = {
-  甲子: ['戌', '亥'], 甲戌: ['申', '酉'], 甲申: ['午', '未'],
-  甲午: ['辰', '巳'], 甲辰: ['寅', '卯'], 甲寅: ['子', '丑'],
-};
+/** 检测空亡：日柱旬空（旬内十干配完，余下两地支为空） */
+const TIAN_GAN_ORDER = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const DI_ZHI_ORDER = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 
-function kongWangOfDay(dayGanZhi: string): string[] {
-  for (const [xun, kongs] of Object.entries(XUN_KONG)) {
-    if (dayGanZhi.startsWith(xun[0]) || dayGanZhi === xun || dayGanZhi.endsWith(xun[1])) {
-      return kongs;
-    }
+/** 60 甲子表（索引 0=甲子 … 59=癸亥） */
+const JIA_ZI: string[] = (() => {
+  const arr: string[] = [];
+  for (let i = 0; i < 60; i++) {
+    arr.push(TIAN_GAN_ORDER[i % 10] + DI_ZHI_ORDER[i % 12]);
   }
-  return [];
+  return arr;
+})();
+
+/** 六旬空亡：每旬 10 组干支配完，余下两个地支即为空亡 */
+const XUN_KONG_BY_INDEX: string[][] = [
+  ['戌', '亥'], // 甲子旬 (0-9)
+  ['申', '酉'], // 甲戌旬 (10-19)
+  ['午', '未'], // 甲申旬 (20-29)
+  ['辰', '巳'], // 甲午旬 (30-39)
+  ['寅', '卯'], // 甲辰旬 (40-49)
+  ['子', '丑'], // 甲寅旬 (50-59)
+];
+
+/**
+ * 按日干支取旬空地支。
+ * 算法：先查日干支在 60 甲子中的序号，再按 floor(idx/10) 定其所属旬，返回该旬空亡。
+ * 例：甲午 → idx=30 → 第 3 旬(甲午旬) → 空辰巳。
+ */
+function kongWangOfDay(dayGanZhi: string): string[] {
+  const idx = JIA_ZI.indexOf(dayGanZhi);
+  if (idx < 0) return [];
+  return XUN_KONG_BY_INDEX[Math.floor(idx / 10)] || [];
 }
 
 /** 月破：与月支相冲的爻地支 */
@@ -440,10 +494,15 @@ export function validateLiuyaoInput(input: {
 }
 
 export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
-  const solar = Solar.fromYmd(
+  // 时辰必须参与起卦：时柱干支与"下卦数"都依赖它。
+  // 时辰序号 → 小时：子=0、丑=2、寅=4 …… 亥=22（各取该时辰起点，子时跨 23-01 故取 0 点）。
+  const solar = Solar.fromYmdHms(
     Number(input.solarDate.slice(0, 4)),
     Number(input.solarDate.slice(5, 7)),
     Number(input.solarDate.slice(8, 10)),
+    input.timeIndex * 2,
+    0,
+    0,
   );
   const lunar = solar.getLunar();
   const ganzhi = {
@@ -485,8 +544,10 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
 
   // ── 步骤 2：本卦所属宫 + 世爻
   const guaGong = guaGongByName(benGua);
-  const guaGongWuxing = TRIGRAM_WUXING[guaGong.slice(0, 1)] || '土';
-  const shiYaoIdx = shiYaoPosition(guaGong, benGua);
+  // 卦宫五行决定六亲：必须用八宫五行表（乾兑金/离火/震巽木/坎水/艮坤土），
+  // 不可按卦象五行取——宫五行与卦象五行在八宫体系下是两个不同概念。
+  const guaGongWuxing = GONG_WUXING[guaGong] || '土';
+  const shiYaoIdx = shiYaoPosition(benGua);
   const yingYaoIdx = yingYaoPosition(shiYaoIdx);
 
   // ── 步骤 3：装六爻（纳甲 + 六亲 + 六兽）
@@ -494,22 +555,15 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
   const benNaiJia = NAI_JIA_TABLE[benLower];
   const bianNaiJia = NAI_JIA_TABLE[bianLower];
 
-  // 上卦纳甲：上卦六爻中第 4/5/6 爻位（位置 4-6）用上卦的纳甲
-  // 下卦纳甲：下卦六爻中第 1/2/3 爻位（位置 1-3）用下卦的纳甲
-  // 简化：上卦三爻（位置 4-6）从上卦 NAI_JIA 取前 3 个，下卦三爻（位置 1-3）从下卦 NAI_JIA 取前 3 个
+  // 京房纳甲取位规则：每经卦自带六位纳甲，前三位属内卦（初/二/三爻）、后三位属外卦（四/五/六爻）。
+  // 故下卦三爻取下卦经卦的 index 0-2，上卦三爻取上卦经卦的 index 3-5——统一为 pos-1。
   const benNaiJiaForYao = (pos: number): { gan: string; zhi: string } => {
-    if (pos <= 3) {
-      // 下卦爻位 1=初爻，对应下卦 NAI_JIA[0]
-      return { gan: benNaiJia.gan[pos - 1], zhi: benNaiJia.zhi[pos - 1] };
-    }
-    // 上卦爻位 4-6，对应上卦 NAI_JIA[0..2]（初爻位）
-    return { gan: NAI_JIA_TABLE[benUpper].gan[pos - 4], zhi: NAI_JIA_TABLE[benUpper].zhi[pos - 4] };
+    const t = pos <= 3 ? benNaiJia : NAI_JIA_TABLE[benUpper];
+    return { gan: t.gan[pos - 1], zhi: t.zhi[pos - 1] };
   };
   const bianNaiJiaForYao = (pos: number): { gan: string; zhi: string } => {
-    if (pos <= 3) {
-      return { gan: bianNaiJia.gan[pos - 1], zhi: bianNaiJia.zhi[pos - 1] };
-    }
-    return { gan: NAI_JIA_TABLE[bianUpper].gan[pos - 4], zhi: NAI_JIA_TABLE[bianUpper].zhi[pos - 4] };
+    const t = pos <= 3 ? bianNaiJia : NAI_JIA_TABLE[bianUpper];
+    return { gan: t.gan[pos - 1], zhi: t.zhi[pos - 1] };
   };
 
   const yaoList: LiuyaoYao[] = [];
@@ -574,26 +628,72 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
     ? `${ys.name}爻：${yaoList[yongShenPos - 1].gan}${yaoList[yongShenPos - 1].zhi}（${yaoList[yongShenPos - 1].zhiWuxing}）`
     : `${ys.name}（本卦未直接出现，看伏神/变卦之爻）`;
 
-  // ── 步骤 5：检测空亡 + 月破
+  // ── 步骤 5：深度分析（旺衰 / 日辰作用 / 五神 / 伏神 / 应期 / 地支格局）
   const kongs = kongWangOfDay(ganzhi.day);
   const yuePo = yuePoOfMonth(ganzhi.month.slice(1, 2));
   const detected: LiuyaoFullResult['detectedPatterns'] = [];
-  for (const y of yaoList) {
-    if (kongs.includes(y.zhi)) {
-      detected.push({ name: `${y.position}爻${y.zhi}空亡（日柱旬空）`, nature: '中性', note: `空亡不直接等于坏，翻译成"力量虚、易落空拖延、待时填实"` });
-    }
-    if (y.zhi === yuePo) {
-      detected.push({ name: `${y.position}爻${y.zhi}月破（月冲）`, nature: '凶', note: `月破之爻主破散无用，难以成事` });
-    }
-  }
-  // 用神月破汇总（避免与上面逐爻重复）：
-  const yongShenYao = yongShenPos ? yaoList[yongShenPos - 1] : null;
-  if (yongShenYao && yongShenYao.zhi === yuePo) {
-    detected.push({ name: '用神月破', nature: '凶', note: '用神受月冲，所问之事难以成就' });
-  }
+
+  const analysis = analyzeLiuyao({
+    yaos: yaoList.map((y) => ({
+      position: y.position,
+      zhi: y.zhi,
+      liuqin: y.liuqin,
+      isDong: y.isDong,
+      bianZhi: y.bianZhi,
+      isShi: y.isShi,
+      isYing: y.isYing,
+    })),
+    monthZhi: ganzhi.month.slice(1, 2),
+    dayZhi: ganzhi.day.slice(1, 2),
+    kongWang: kongs,
+    yongShenLiuqin: ys.name,
+    guaGong,
+  });
+
+  // 全局背景：日柱旬空（逐爻的真空/暂空区分由 analysis 给出，此处只记旬空整体）
   if (kongs.length > 0) {
-    detected.push({ name: `日空亡（${kongs.join('/')}）`, nature: '中性', note: '空亡地支对应的爻力量减弱，待时填实' });
+    detected.push({
+      name: `日空亡（${kongs.join('/')}）`,
+      nature: '中性',
+      note: '空亡不直接等于坏，主力量虚、易落空拖延、待时填实；逐爻真假见【逐爻分析】',
+    });
   }
+
+  // 用神层面的结论（断卦关键，单独凸显，不靠逐爻清单淹没）
+  const yongShenYao = yongShenPos ? yaoList[yongShenPos - 1] : null;
+  const yongShenAna = yongShenPos ? analysis.yaoAnalysis.find((a) => a.position === yongShenPos) : undefined;
+  if (yongShenYao && yongShenAna) {
+    if (yongShenYao.zhi === yuePo) {
+      detected.push({ name: '用神月破', nature: '凶', note: '用神受月冲，主破散，所问之事难以成就' });
+    }
+    if (yongShenAna.voidState === '真亡') {
+      detected.push({ name: '用神真空', nature: '凶', note: '用神静空休囚未得日助为真亡，不受动变冲实，所求不成' });
+    } else if (yongShenAna.voidState === '暂空') {
+      detected.push({ name: '用神暂空', nature: '中性', note: '用神暂空，出空填实日再应已受之生吉或克凶' });
+    }
+    if (yongShenAna.isDayBreak) {
+      detected.push({ name: '用神日破', nature: '凶', note: '用神被日辰冲散，动变均失用' });
+    }
+    if (yongShenAna.isAnDong) {
+      detected.push({ name: '用神暗动', nature: '中性', note: '用神暗动，外力使令而动，有生克资格但程度看旺衰' });
+    }
+    detected.push({
+      name: `用神${yongShenAna.strength === '强' ? '旺相有力' : yongShenAna.strength === '弱' ? '休囚无力' : '旺衰中和'}`,
+      nature: yongShenAna.strength === '强' ? '吉' : yongShenAna.strength === '弱' ? '凶' : '中性',
+      note: `月令${yongShenAna.monthPower}（${yongShenAna.isDeshi ? '得令' : '失令'}）· 日辰${yongShenAna.dayRelation || '无作用'}`,
+    });
+  }
+  // 用神伏藏（八纯卦等本卦不现用神时）
+  if (analysis.fuShen) {
+    detected.push({
+      name: `用神伏藏（伏${analysis.fuShen.position}爻${analysis.fuShen.zhi}·${analysis.fuShen.state}）`,
+      nature: analysis.fuShen.state === '开伏' ? '中性' : '凶',
+      note: analysis.fuShen.reason,
+    });
+  }
+
+  // 合并深度分析命中的逐爻状态与地支格局（六冲/六合/三合/三刑/进退/回头生克 等）
+  detected.push(...analysis.patterns);
 
   // ── 步骤 6：边界提醒
   const warnings: string[] = [];
@@ -612,6 +712,7 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
     chart,
     yongShen: { name: yongShenDetail, reason: ys.reason, position: yongShenPos },
     detectedPatterns: detected,
+    analysis,
     warnings,
   };
 }
@@ -622,7 +723,7 @@ export function castLiuyaoChart(input: LiuyaoInput): LiuyaoFullResult {
  * 注：本结构与上面 return 的 chart 子结构保持一致；若未来 chart 加字段，本函数须同步扩展。
  */
 export function extractChartSummary(result: LiuyaoFullResult) {
-  const { ganzhi, chart, yongShen, detectedPatterns } = result;
+  const { ganzhi, chart, yongShen, detectedPatterns, analysis } = result;
   return {
     四柱: ganzhi,
     本卦: {
@@ -643,16 +744,58 @@ export function extractChartSummary(result: LiuyaoFullResult) {
     },
     用神: yongShen,
     命中格局: detectedPatterns.map((p) => ({ 名称: p.name, 性质: p.nature, 释义: p.note })),
-    爻明细: chart.yaoList.map((y) => ({
-      爻位: y.position,
-      阴阳: y.yinYang,
-      纳甲: `${y.gan}${y.zhi}`,
-      五行: y.zhiWuxing,
-      六亲: y.liuqin,
-      六兽: y.liushou,
-      世应: y.isShi ? '世' : y.isYing ? '应' : '',
-      动爻: y.isDong ? `动→${y.bianYinYang} ${y.bianGan}${y.bianZhi}` : '',
+    爻明细: chart.yaoList.map((y) => {
+      const a = analysis.yaoAnalysis.find((x) => x.position === y.position);
+      const marks: string[] = [];
+      if (a) {
+        if (a.isMonthBreak) marks.push('月破');
+        if (a.isAnDong) marks.push('暗动');
+        if (a.isDayBreak) marks.push('日破');
+        if (a.graveZhi) marks.push(`入墓${a.graveZhi}`);
+        if (a.jinTui) marks.push(a.jinTui);
+        if (a.huiTou) marks.push(a.huiTou);
+      }
+      return {
+        爻位: y.position,
+        阴阳: y.yinYang,
+        纳甲: `${y.gan}${y.zhi}`,
+        五行: y.zhiWuxing,
+        六亲: y.liuqin,
+        六兽: y.liushou,
+        世应: y.isShi ? '世' : y.isYing ? '应' : '',
+        动爻: y.isDong ? `动→${y.bianYinYang} ${y.bianGan}${y.bianZhi}` : '',
+        月令: a ? `${a.monthPower}${a.isDeshi ? '(得令)' : '(失令)'}` : '',
+        日辰: a ? a.dayRelation || '无' : '',
+        强弱: a ? a.strength : '',
+        空亡: a ? a.voidState : '',
+        特殊: marks.join('/') || '无',
+      };
+    }),
+    五神: {
+      用神: analysis.fiveShen.yongShen,
+      原神: analysis.fiveShen.yuanShen,
+      忌神: analysis.fiveShen.jiShen,
+      仇神: analysis.fiveShen.chouShen,
+      喜神: analysis.fiveShen.xiShen,
+      口径: analysis.fiveShen.intent,
+    },
+    伏神: analysis.fuShen
+      ? {
+          六亲: analysis.fuShen.liuqin,
+          爻位: analysis.fuShen.position,
+          地支: analysis.fuShen.zhi,
+          飞爻: `第${analysis.fuShen.feiPosition}爻${analysis.fuShen.feiZhi}`,
+          状态: analysis.fuShen.state,
+          理由: analysis.fuShen.reason,
+        }
+      : '用神在卦，无需伏神',
+    应期候选: analysis.timings.map((t) => ({
+      机制: t.mechanism,
+      触发地支: t.triggerBranch || '—',
+      含义: t.meaning,
+      快慢: t.speed,
     })),
+    间爻: analysis.jianYao.length > 0 ? analysis.jianYao : '世应相邻，无间爻',
   };
 }
 
@@ -661,20 +804,58 @@ export function extractChartSummary(result: LiuyaoFullResult) {
 import { CONSTITUTION } from '@/lib/ai/prompt-constitution';
 
 const LIUYAO_MODULE_SPECIFIC = `【六爻模块专项·京房纳甲体系】
-1. 体系定位：京房纳甲 + 八宫六十四卦；装六亲（父母/兄弟/子孙/妻财/官鬼）、装六兽（青龙/朱雀/勾陈/螣蛇/白虎/玄武）、定世应、按问题类型与卦主六亲取用神。
-2. 严格使用规范术语：世爻/应爻/用神/原神/忌神/仇神/伏神；动爻/变爻/卦变；六亲仅限父母/兄弟/子孙/妻财/官鬼；六兽仅限上述六名；不得使用"灵魂伴侣""能量场"等口语化/泛灵性词汇。
-3. 用神选取规则（按问题类型优先、卦主六亲兜底）：
-   · 求财/交易/投资/求物：以妻财爻为用神；
-   · 事业/工作/求职/官非/诉讼：以官鬼爻为用神；
-   · 文书/考试/合同/求学：以父母爻为用神；
-   · 健康/脱困/忧虑/疾病：以子孙爻为用神（子孙制官鬼解忧）；
-   · 婚恋/感情/桃花：男问以妻财为用神，女问以官鬼为用神；不指定则按卦主六亲反推。
-   · 卦主六亲 = 世爻所纳地支与卦宫五行的生克关系；用于"我"是谁的判断。
-4. 用神伏藏规则：若本卦未直接出现用神六亲之爻（即八纯卦之乾/坤/震/巽/坎/离/艮/兑仅含两种六亲），须以"伏神"思路补足——按本宫八卦伏神表查阅，并相应说明"伏神不现、待时引出"；不得擅自判定"用神缺失、此事不可成"。
-5. 动爻判断：动爻变阴变阳，动爻之变卦纳甲与六亲为"变爻之用神"，可与本卦用神互参；动爻所在之爻本身亦参与用神生克链。
-6. 世应关系：世爻为求测者（或主问方），应爻为所问之对方/对境/外部环境；世应相生为顺、世应相克为阻；应爻动则视外部有变。
-7. 命中格局：空亡（日柱旬空）= 力量虚、易落空、待时填实，不直接等于坏；月破（月支冲爻）= 主破散无用，难以成事；用神月破 = 用神受冲、所问之事难以成就。
-8. 调理建议按调理建议操作性铁律展开：用神旺相则顺势而进，用神休囚或空亡则填实/扶持，用神被克则泄化/通关（按相生链通关）。`;
+1. 体系定位：京房八宫六十四卦 + 纳甲装卦。装六亲（父母/兄弟/子孙/妻财/官鬼）、装六兽（青龙/朱雀/勾陈/螨蛇/白虎/玄武）、定世应、取用神、推五神（原神/忌神/仇神/喜神）、查伏神、定应期。
+
+2. 【卦宫铁律】六亲由「卦宫五行」决定，不是卦象五行。八宫五行：乾兑金、离火、震巰木、坎水、艮坤土。【确定性盘面骨架】中「本卦.宫」与「宫五行」为唯一权威，不得自行改判宫位，也不得改按上下卦象取五行。
+
+3. 【旺衰与强弱·两段论】
+   · 旺衰由月令定（原局背景）：当令者旺、我生者相、生我者休、克我者囚、我克者死。得令 = 旺或相。
+   · 强弱由日辰与动变定（当下能否发力）：日辰生合为有助、日辰克冲为受制。
+   · 结论口径：旺衰是底子，强弱是当下。「月令旺但日克」不等于无用，「月令衰但日生」也不等于可用——必须两段合并陈述，不得只拿一段下定论。
+
+4. 【空亡真假】
+   · 暂空：动空（不论旺衰）、静空但旺相、静空休囚而得日辰生助 → 出空填实日再应；有权动变冲之为冲实有用。
+   · 真亡（真空）：静空且休囚且未得日辰生助、或用神空化空 → 不受动变冲实、不主动作用，所求不成。
+   · 不得一律把空亡说成「凶」，也不得一律说成「拖延」。
+
+5. 【日辰四种作用】
+   · 生/合：为有助，增力。
+   · 克：为受制，减力。
+   · 冲静爻（非空）：为暗动——由外力使令而动，有生克资格但不能独立冲合；衰暗动仍有生克资格，旺衰只表程度。
+   · 冲动爻：为日破（冲散）——动变均失用；日冲变爻亦称日破。
+   · 月破（月支冲爻）：为原局背景中的残缺破损，须以所问欲成欲散定吉凶，不凭破断事实。
+
+6. 【进退神与回头生克】
+   · 化进：吉用与原神宜进；休囚化进者近事暂不进。
+   · 化退：忌神仇神宜退；旺相化退者近事暂不退。所求是解除凶患时，凶用退才有利。
+   · 回头克：动化之爻克原动爻，无有效解救时原动爻力量被克尽；有解救须查贪生忘克。
+   · 回头生：动化之爻生原动爻，主自身变化带来成就。
+
+7. 【五神与欲成欲散】
+   · 原神生用神、忌神克用神、仇神生忌神且克原神、喜神克忌神。
+   · 不得用「耗」「泄」解释五神。
+   · 口径：吉用（想成/想得）时原神喜神为吉、忌神仇神为凶；凶用（想散/想败）时反是。
+   · 冲对欲聚欲成之事为忌，对欲散欲脱之事为喜——同一格局在不同口径下吉凶相反，必须先定口径再断吉凶。
+
+8. 【地支格局取象，不擅断事实】
+   · 冲主快、散、改变；合主聚集、协作、迟缓。
+   · 六害、六破只取失约、阻隔、被干涉、破坏之象，不另增吉凶权重（六害须先有合再被冲破方论）。
+   · 三合局须三支齐全并满足动变条件，化局作一条主作用，取多人结伙、聚会之象。
+   · 三刑须三支俱全且卦爻俱动，或两发动刑支与日辰浑齐；吉凶随旺衰与有无制救。辰午酉亥自刑不主吉凶，只取自作自受、烦恼之象。
+   · 入墓：实际入墓者暂停主动与受作用权；动冲墓或流时冲墓为出墓应事条件。
+   · 间爻（世应之间的爻）主中间人、中介、阻隔环节。
+
+9. 【伏神飞伏】用神不上卦时查本宫伏神。开伏（日生伏/日值伏/日冲伏不带克/飞爻空/飞生伏）则伏神可出、待时引出；闭伏（日克伏/飞克伏）则须先解除飞爻覆盖。不得因用神不上卦就断定「此事不可成」。
+
+10. 【取用神，轻六神】用神为吉凶主判依据；六兽（青龙朱雀勾陈螨蛇白虎玄武）只作人物情状、事态气氛的辅助描述，不得单凭六兽定吉凶。
+
+11. 【应期】严格按【应期候选】给出的机制与触发地支陈述（逢值/逢冲/逢合/出空填实/冲墓/出月令/化进化退）。只给地支与条件，绝不换算成具体公历日期，不承诺「某月某日」。
+
+12. 【断卦顺序·三段递进】先本卦（定用神、看月令旺衰、看世应）→ 再看变爻（动爻化什么、回头生克、进退神）→ 最后看日辰（生克冲合、暗动日破、出空出墓）。三段结论合并后再下吉凶判断，不得跳过任一段直接给结论。
+
+13. 【术语规范】世爻/应爻/用神/原神/忌神/仇神/喜神/伏神/飞爻；动爻/变爻/化进/化退/回头生克；六亲仅限父母/兄弟/子孙/妻财/官鬼；六兽仅限上述六名。不得使用「灵魂伴侣」「能量场」等口语化/泛灵性词汇。
+
+14. 调理建议按调理建议操作性铁律展开：用神旺相则顺势而进，用神休囚或暂空则填实/扶持，用神被克则泄化/通关（按相生链通关）。`;
 
 export interface LiuyaoPromptBundle {
   systemPrompt: string;
@@ -701,13 +882,14 @@ export function buildLiuyaoPrompt(
     '【确定性盘面骨架】（请逐项引用，禁止重新计算）',
     JSON.stringify(summary, null, 2),
     '',
-    '【期望输出结构】（八段依次给出，每段以【】单独成行）',
-    '【断事总纲】本卦之卦象、卦意、整体吉凶倾向（150 字内）。',
-    '【世应关系】世爻与应爻的五行关系、世应动静、代表求测者与外部环境的态势。',
-    '【用神分析】用神六亲、用神爻位、用神生克旺相（伏神情况须说明）、与世应之关系。',
-    '【动爻与变卦】动爻位置、变卦名、变爻五行变化、对本卦的转化方向。',
-    '【命中格局】空亡、月破、六合、六冲、三刑等格局对用神/世应的影响（依【命中格局】清单逐项解读）。',
-    '【事态推断】结合问事类型与卦象，给出具体事态的应期与走向（事业/财/感情/健康等分别落到实际场景）。',
+    '【期望输出结构】（九段依次给出，每段以【】单独成行）',
+    '【断事总纲】本卦卦象、所属宫位与宫五行、整体吉凶倾向（150 字内）。',
+    '【世应关系】世爻与应爻的五行生克、世应动静、间爻有无；代表求测者与外部环境的态势。',
+    '【用神旺衰】用神六亲与爻位；月令旺相休囚死（得令与否）、日辰生克冲合、强弱结论、空亡真假（须引用【爻明细】的月令/日辰/强弱/空亡字段）；用神不上卦时须说明伏神爻位与开闭伏。',
+    '【五神生克】按【五神】逐项说明原神/忌神/仇神/喜神在卦中的旺衰与动静，及其对用神的利害；必须先说明本局属吉用还是凶用口径。',
+    '【动爻与变卦】动爻位置、变卦名、变爻纳甲与五行变化、化进化退、回头生克，以及对本卦的转化方向。',
+    '【命中格局】依【命中格局】清单逐项解读（六冲/六合/三合局/三刑/六害/六破/月破/暗动/日破/真空暂空/入墓），并说明对用神与世应的影响。',
+    '【事态推断与应期】结合问事类型给出具体走向；应期严格按【应期候选】的机制与触发地支陈述，只给地支条件、不换算公历日期。',
     '【调理建议】按调理建议操作性铁律展开，至少 3 条可立即执行的物品/方位/动作建议。',
     '【风险与边界】明确说明本判断的局限与不确定点，建议咨询专业人士的场景（如重大财务决定、健康疑虑、法律纠纷）。',
   ]

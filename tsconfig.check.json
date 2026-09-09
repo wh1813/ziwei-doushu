@@ -38,6 +38,7 @@
     "lib/qimen/remedy.ts",
     "lib/qimen/history.ts",
     "lib/liuyao/engine.ts",
+    "lib/liuyao/analysis.ts",
     "lib/liuyao/history.ts",
     "lib/daliuren/engine.ts",
     "lib/daliuren/history.ts",

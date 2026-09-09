@@ -62,6 +62,54 @@ interface LiuyaoChart {
   yaoList: LiuyaoYao[];
 }
 
+interface LiuyaoYaoAnalysis {
+  position: number;
+  monthPower: string;
+  isDeshi: boolean;
+  dayRelation: string;
+  strength: string;
+  voidState: string;
+  isMonthBreak: boolean;
+  isAnDong: boolean;
+  isDayBreak: boolean;
+  jinTui?: string;
+  huiTou?: string;
+}
+
+interface LiuyaoFiveShen {
+  yongShen: string;
+  yuanShen: string;
+  jiShen: string;
+  chouShen: string;
+  xiShen: string;
+  intent: string;
+}
+
+interface LiuyaoTiming {
+  mechanism: string;
+  triggerBranch: string;
+  meaning: string;
+  speed: string;
+}
+
+interface LiuyaoFuShen {
+  liuqin: string;
+  position: number;
+  zhi: string;
+  feiPosition: number;
+  feiZhi: string;
+  state: string;
+  reason: string;
+}
+
+interface LiuyaoAnalysis {
+  yaoAnalysis: LiuyaoYaoAnalysis[];
+  fiveShen: LiuyaoFiveShen;
+  timings: LiuyaoTiming[];
+  fuShen: LiuyaoFuShen | null;
+  jianYao: number[];
+}
+
 interface LiuyaoFullPayload {
   input: {
     solarDate: string;
@@ -76,6 +124,7 @@ interface LiuyaoFullPayload {
   yongShen: { name: string; reason: string; position: number | null };
   detectedPatterns: Array<{ name: string; nature: "吉" | "凶" | "中性"; note: string }>;
   warnings: string[];
+  analysis?: LiuyaoAnalysis;
   recordId?: string | null;
 }
 
@@ -463,7 +512,53 @@ export default function LiuyaoPage() {
                     <span className="w-8 text-[11px] text-slate-500">{y.zhiWuxing}</span>
                     <span className="w-12 text-emerald-300">{y.liuqin}</span>
                     <span className="w-12 text-purple-300">{y.liushou}</span>
-                    <span className="flex-1 flex items-center gap-1.5">
+                    <span className="flex-1 flex flex-wrap items-center gap-1.5">
+                      {(() => {
+                        const a = chartData.analysis?.yaoAnalysis.find((x) => x.position === y.position);
+                        if (!a) return null;
+                        return (
+                          <>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                a.isDeshi ? "bg-emerald-900/60 text-emerald-300" : "bg-slate-800 text-slate-400"
+                              }`}
+                              title={a.isDeshi ? "月令得令（旺或相）" : "月令失令（休囚死）"}
+                            >
+                              {a.monthPower}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400" title="日辰对本爻的作用">
+                              日{a.dayRelation || "—"}
+                            </span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                a.strength === "强"
+                                  ? "bg-emerald-900/60 text-emerald-300"
+                                  : a.strength === "弱"
+                                  ? "bg-red-900/60 text-red-300"
+                                  : "bg-slate-800 text-slate-400"
+                              }`}
+                              title="旺衰由月令定，强弱由日辰与动变定"
+                            >
+                              {a.strength}
+                            </span>
+                            {a.voidState !== "无" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-900/60 text-orange-300">{a.voidState}</span>
+                            )}
+                            {a.isMonthBreak && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/60 text-red-300">月破</span>
+                            )}
+                            {a.isAnDong && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300">暗动</span>
+                            )}
+                            {a.jinTui && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300">{a.jinTui}</span>
+                            )}
+                            {a.huiTou && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-300">{a.huiTou}</span>
+                            )}
+                          </>
+                        );
+                      })()}
                       {y.isShi && <span className="text-[10px] px-1.5 py-0.5 bg-amber-700 text-amber-100 rounded">世</span>}
                       {y.isYing && <span className="text-[10px] px-1.5 py-0.5 bg-sky-700 text-sky-100 rounded">应</span>}
                       {y.isDong && (
@@ -497,6 +592,65 @@ export default function LiuyaoPage() {
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* 五神与应期（深度分析） */}
+            {chartData.analysis && (
+              <div className="mt-4">
+                <div className="text-xs text-slate-500 mb-1.5">
+                  五神（{chartData.analysis.fiveShen.intent === "凶用" ? "欲散：想散/想败" : "欲成：想成/想得"}）
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { k: "用神", v: chartData.analysis.fiveShen.yongShen, c: "text-amber-300" },
+                    { k: "原神", v: chartData.analysis.fiveShen.yuanShen, c: "text-emerald-300" },
+                    { k: "喜神", v: chartData.analysis.fiveShen.xiShen, c: "text-emerald-300" },
+                    { k: "忌神", v: chartData.analysis.fiveShen.jiShen, c: "text-red-300" },
+                    { k: "仇神", v: chartData.analysis.fiveShen.chouShen, c: "text-red-300" },
+                  ].map((s) => (
+                    <span key={s.k} className="text-[11px] px-2 py-1 rounded-lg border border-slate-700 bg-slate-950">
+                      <span className="text-slate-500">{s.k}</span> <span className={s.c}>{s.v}</span>
+                    </span>
+                  ))}
+                </div>
+
+                {chartData.analysis.fuShen && (
+                  <div className="mt-2 text-[11px] text-slate-400 leading-relaxed">
+                    伏神：<span className="text-amber-300">{chartData.analysis.fuShen.liuqin}</span> 伏于第
+                    {chartData.analysis.fuShen.position}爻 {chartData.analysis.fuShen.zhi}
+                    <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                      {chartData.analysis.fuShen.state}
+                    </span>
+                    <span className="text-slate-500 ml-1">{chartData.analysis.fuShen.reason}</span>
+                  </div>
+                )}
+
+                {chartData.analysis.timings.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-slate-500 mb-1">应期候选（只给地支条件，非公历日期）</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {chartData.analysis.timings.map((t, i) => (
+                        <span
+                          key={i}
+                          className="text-[11px] px-2 py-1 rounded-lg border border-slate-700 bg-slate-950 text-slate-300"
+                        >
+                          {t.meaning}
+                          {t.triggerBranch && <span className="text-sky-300 ml-1">·{t.triggerBranch}</span>}
+                          <span className={t.speed === "快" ? "text-orange-300 ml-1" : "text-slate-500 ml-1"}>
+                            ({t.speed})
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {chartData.analysis.jianYao.length > 0 && (
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    间爻（世应之间，主中间人/阻隔环节）：第 {chartData.analysis.jianYao.join("、")} 爻
+                  </div>
+                )}
               </div>
             )}
 
