@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
+import { useTheme } from "@/components/ThemeProvider";
+import { getSkin } from "@/lib/ui/theme";
 
 const TIME_OPTIONS = [
   { value: 0, label: "早子时 00:00-01:00" },
@@ -129,6 +131,18 @@ interface LiuyaoFullPayload {
 }
 
 export default function LiuyaoPage() {
+  const { theme } = useTheme();
+  const skin = getSkin(theme);
+
+  useLayoutEffect(() => {
+    document.documentElement.style.background = skin.bgBase;
+    document.body.style.background = skin.bgBase;
+    return () => {
+      document.documentElement.style.background = '';
+      document.body.style.background = '';
+    };
+  }, [skin.bgBase]);
+
   const [solarDate, setSolarDate] = useState("");
   const [timeIndex, setTimeIndex] = useState<number>(6);
   const [method, setMethod] = useState<"time" | "number">("time");
@@ -247,12 +261,12 @@ export default function LiuyaoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
+    <div className="min-h-screen text-slate-100 py-10 px-4" style={{ background: skin.bgInput }}>
       <div className="max-w-3xl mx-auto pt-14">
         <TopNav />
         {/* 页面标题 */}
-        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b border-slate-800">
-          <h1 className="text-xl font-bold tracking-wider text-amber-400">六爻 · 起卦解卦</h1>
+        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b" style={{ borderColor: skin.borderSubtle }}>
+          <h1 className="text-xl font-bold tracking-wider" style={{ color: skin.gold }}>六爻 · 起卦解卦</h1>
           <div className="w-12"></div>
         </div>
 
@@ -280,7 +294,7 @@ export default function LiuyaoPage() {
                 <span className="text-base font-bold text-amber-300">周易古占 · 铜钱摇卦</span>
                 <span className="text-[10px] text-rose-300/80 font-mono tracking-widest">LIÙ YÁO</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs leading-relaxed" style={{ color: skin.textSecond }}>
                 京房纳甲法，秦汉以来最盛之占。一卦六爻，初爻为始、上爻为终；
                 <span className="text-amber-300 font-semibold">纳甲</span>
                 排干支于爻中、<span className="text-emerald-300 font-semibold">六亲</span>
@@ -292,34 +306,34 @@ export default function LiuyaoPage() {
         </div>
 
         {/* 输入表单 */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8 space-y-5">
-          <p className="text-xs text-slate-500 leading-relaxed">
-            本功能由程序先用 <span className="text-amber-400">确定性京房纳甲算法严格起卦</span>
+        <div className="border rounded-2xl p-6 shadow-xl mb-8 space-y-5" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
+          <p className="text-xs leading-relaxed" style={{ color: skin.textDim }}>
+            本功能由程序先用 <span style={{ color: skin.gold }}>确定性京房纳甲算法严格起卦</span>
             （前后卦、纳甲、六亲、六兽、世应、动爻、用神、命中格局均为计算，非 AI 猜测），
-            起卦确认后再交由 AI 依盘解卦 —— <span className="text-amber-400">先起卦，再解卦</span>。
+            起卦确认后再交由 AI 依盘解卦 —— <span style={{ color: skin.gold }}>先起卦，再解卦</span>。
           </p>
 
           {/* 起卦日期 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">📅 起卦日期（阳历，必填）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>📅 起卦日期（阳历，必填）</label>
             <input
               type="date"
               value={solarDate}
               onChange={(e) => setSolarDate(e.target.value)}
               min="1900-01-01"
               max="2049-12-31"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+              className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             />
-            <p className="text-xs text-slate-500 mt-1">按北京时间起卦；问事一般以当下时间起卦</p>
+            <p className="text-xs mt-1" style={{ color: skin.textDim }}>按北京时间起卦；问事一般以当下时间起卦</p>
           </div>
 
           {/* 时辰 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">⏰ 起卦时辰（必选）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>⏰ 起卦时辰（必选）</label>
             <select
               value={timeIndex}
               onChange={(e) => setTimeIndex(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+              className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             >
               {TIME_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -329,18 +343,17 @@ export default function LiuyaoPage() {
 
           {/* 起卦方式 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">🔮 起卦方式</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>🔮 起卦方式</label>
             <div className="flex flex-wrap gap-2">
               {METHODS.map((m) => (
                 <button
                   key={m.value}
                   type="button"
                   onClick={() => setMethod(m.value as "time" | "number")}
-                  className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${
-                    method === m.value
-                      ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
-                      : "border-slate-700 hover:bg-slate-800 text-slate-400"
-                  }`}
+                  className="px-3.5 py-1.5 text-sm rounded-lg border transition-all"
+                  style={method === m.value
+                    ? { background: "rgba(212,175,55,0.12)", borderColor: skin.gold, color: skin.goldLight, fontWeight: 700 }
+                    : { borderColor: skin.border, color: skin.textMuted }}
                 >
                   {m.label}
                 </button>
@@ -351,7 +364,7 @@ export default function LiuyaoPage() {
           {/* 数字输入（仅 number 方式） */}
           {method === "number" && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>
                 🔢 两个数字（1-999；上下卦数 = a+b，动爻 = a % 6）
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -362,7 +375,7 @@ export default function LiuyaoPage() {
                   value={numberA}
                   onChange={(e) => setNumberA(e.target.value)}
                   placeholder="数字 A（如 1）"
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+                  className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
                 />
                 <input
                   type="number"
@@ -371,7 +384,7 @@ export default function LiuyaoPage() {
                   value={numberB}
                   onChange={(e) => setNumberB(e.target.value)}
                   placeholder="数字 B（如 23）"
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+                  className="border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
                 />
               </div>
             </div>
@@ -379,18 +392,17 @@ export default function LiuyaoPage() {
 
           {/* 性别（影响婚恋用神） */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">👤 性别（影响婚恋用神）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>👤 性别（影响婚恋用神）</label>
             <div className="flex flex-wrap gap-2">
               {GENDERS.map((g) => (
                 <button
                   key={g.value}
                   type="button"
                   onClick={() => setGender(g.value as "男" | "女" | "不指定")}
-                  className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${
-                    gender === g.value
-                      ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
-                      : "border-slate-700 hover:bg-slate-800 text-slate-400"
-                  }`}
+                  className="px-3.5 py-1.5 text-sm rounded-lg border transition-all"
+                  style={gender === g.value
+                    ? { background: "rgba(212,175,55,0.12)", borderColor: skin.gold, color: skin.goldLight, fontWeight: 700 }
+                    : { borderColor: skin.border, color: skin.textMuted }}
                 >
                   {g.label}
                 </button>
@@ -400,18 +412,17 @@ export default function LiuyaoPage() {
 
           {/* 所问事项类型 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">🗂️ 所问事项类型</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>🗂️ 所问事项类型</label>
             <div className="flex flex-wrap gap-2">
               {QUESTION_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setQuestionType(t)}
-                  className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${
-                    questionType === t
-                      ? "bg-amber-500/20 border-amber-500 text-amber-300 font-bold"
-                      : "border-slate-700 hover:bg-slate-800 text-slate-400"
-                  }`}
+                  className="px-3.5 py-1.5 text-sm rounded-lg border transition-all"
+                  style={questionType === t
+                    ? { background: "rgba(212,175,55,0.12)", borderColor: skin.gold, color: skin.goldLight, fontWeight: 700 }
+                    : { borderColor: skin.border, color: skin.textMuted }}
                 >
                   {t}
                 </button>
@@ -421,14 +432,14 @@ export default function LiuyaoPage() {
 
           {/* 具体问题 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">💬 具体想问的事（可选）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>💬 具体想问的事（可选）</label>
             <textarea
               value={questionGoal}
               onChange={(e) => setQuestionGoal(e.target.value)}
               placeholder="例如：这笔投资该不该进？对方是不是对的人？"
               rows={3}
               maxLength={500}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 resize-none"
+              className="w-full border rounded-lg p-3 text-sm placeholder-slate-500 focus:outline-none focus:border-slate-500 resize-none" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             />
           </div>
 
@@ -442,11 +453,10 @@ export default function LiuyaoPage() {
             type="button"
             onClick={handleCastChart}
             disabled={loadingChart || !solarDate}
-            className={`w-full py-3.5 rounded-xl font-bold text-base transition-all ${
-              loadingChart || !solarDate
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
-            }`}
+            className="w-full py-3.5 rounded-xl font-bold text-base transition-all"
+            style={loadingChart || !solarDate
+              ? { background: skin.bgElevated, color: skin.textDim, cursor: "not-allowed" }
+              : { background: skin.gold, color: skin.textOnGold, boxShadow: "0 10px 15px -3px rgba(212,175,55,0.25)" }}
           >
             {loadingChart ? "正在起卦排盘…" : "第一步 · 起卦排卦"}
           </button>
@@ -454,38 +464,38 @@ export default function LiuyaoPage() {
 
         {/* 排卦结果：卦象 + 六爻列表 */}
         {chartData && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8">
+          <div className="border rounded-2xl p-6 shadow-xl mb-8" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
             {/* 起卦信息 */}
             <div className="space-y-1.5 mb-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-lg font-bold text-amber-300">{chartData.chart.benGua}</span>
-                <span className="text-xs text-slate-500">·</span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs" style={{ color: skin.textDim }}>·</span>
+                <span className="text-xs" style={{ color: skin.textMuted }}>
                   变 <span className="text-purple-300">{chartData.chart.bianGua}</span>
                 </span>
-                <span className="text-xs text-slate-500">·</span>
-                <span className="text-xs text-slate-400">{chartData.chart.guaGong}（{chartData.chart.guaGongWuxing}）</span>
+                <span className="text-xs" style={{ color: skin.textDim }}>·</span>
+                <span className="text-xs" style={{ color: skin.textMuted }}>{chartData.chart.guaGong}（{chartData.chart.guaGongWuxing}）</span>
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs" style={{ color: skin.textMuted }}>
                 公历 {chartData.input.solarDate} · 干支 {chartData.ganzhi.year}年 {chartData.ganzhi.month}月 {chartData.ganzhi.day}日 {chartData.ganzhi.time}时
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs" style={{ color: skin.textMuted }}>
                 上卦 <span className="text-emerald-300">{chartData.chart.benUpperTrigram}</span>
-                <span className="text-slate-600"> / </span>
+                <span style={{ color: skin.textDim }}> / </span>
                 下卦 <span className="text-emerald-300">{chartData.chart.benLowerTrigram}</span>
-                <span className="text-slate-600"> · </span>
+                <span style={{ color: skin.textDim }}> · </span>
                 世爻 <span className="text-amber-300">{chartData.chart.shiYaoIndex}爻</span>
-                <span className="text-slate-600"> · </span>
+                <span style={{ color: skin.textDim }}> · </span>
                 应爻 <span className="text-amber-300">{chartData.chart.yingYaoIndex}爻</span>
-                <span className="text-slate-600"> · </span>
+                <span style={{ color: skin.textDim }}> · </span>
                 动爻 <span className="text-purple-300">{chartData.chart.dongYaoIndices.join("/")}爻</span>
-                <span className="text-slate-600"> · </span>
+                <span style={{ color: skin.textDim }}> · </span>
                 卦主 <span className="text-emerald-300">{chartData.chart.liuqinOfSelf}</span>
               </div>
-              <div className="text-xs text-slate-300">
+              <div className="text-xs" style={{ color: skin.textSecond }}>
                 用神：<span className="text-amber-300 font-bold">{chartData.yongShen.name}</span>
                 {chartData.yongShen.position === null && (
-                  <span className="text-slate-500">（伏藏）</span>
+                  <span style={{ color: skin.textDim }}>（伏藏）</span>
                 )}
               </div>
             </div>
@@ -506,10 +516,10 @@ export default function LiuyaoPage() {
                         : "bg-slate-950 border border-slate-800"
                     }`}
                   >
-                    <span className="w-8 text-slate-500">{["初", "二", "三", "四", "五", "上"][y.position - 1]}爻</span>
-                    <span className="w-6 text-center font-bold text-slate-200">{y.yinYang === "阳" ? "—" : "- -"}</span>
+                    <span className="w-8" style={{ color: skin.textDim }}>{["初", "二", "三", "四", "五", "上"][y.position - 1]}爻</span>
+                    <span className="w-6 text-center font-bold" style={{ color: skin.textPrimary }}>{y.yinYang === "阳" ? "—" : "- -"}</span>
                     <span className="w-14 text-amber-300 font-bold">{y.gan}{y.zhi}</span>
-                    <span className="w-8 text-[11px] text-slate-500">{y.zhiWuxing}</span>
+                    <span className="w-8 text-[11px]" style={{ color: skin.textDim }}>{y.zhiWuxing}</span>
                     <span className="w-12 text-emerald-300">{y.liuqin}</span>
                     <span className="w-12 text-purple-300">{y.liushou}</span>
                     <span className="flex-1 flex flex-wrap items-center gap-1.5">
@@ -526,7 +536,7 @@ export default function LiuyaoPage() {
                             >
                               {a.monthPower}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400" title="日辰对本爻的作用">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800" style={{ color: skin.textMuted }} title="日辰对本爻的作用">
                               日{a.dayRelation || "—"}
                             </span>
                             <span
@@ -574,7 +584,7 @@ export default function LiuyaoPage() {
             {/* 命中格局 */}
             {chartData.detectedPatterns.length > 0 && (
               <div className="mt-4">
-                <div className="text-xs text-slate-500 mb-1.5">命中格局</div>
+                <div className="text-xs mb-1.5" style={{ color: skin.textDim }}>命中格局</div>
                 <div className="flex flex-wrap gap-2">
                   {chartData.detectedPatterns.map((p, i) => (
                     <span
@@ -598,7 +608,7 @@ export default function LiuyaoPage() {
             {/* 五神与应期（深度分析） */}
             {chartData.analysis && (
               <div className="mt-4">
-                <div className="text-xs text-slate-500 mb-1.5">
+                <div className="text-xs mb-1.5" style={{ color: skin.textDim }}>
                   五神（{chartData.analysis.fiveShen.intent === "凶用" ? "欲散：想散/想败" : "欲成：想成/想得"}）
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -609,31 +619,31 @@ export default function LiuyaoPage() {
                     { k: "忌神", v: chartData.analysis.fiveShen.jiShen, c: "text-red-300" },
                     { k: "仇神", v: chartData.analysis.fiveShen.chouShen, c: "text-red-300" },
                   ].map((s) => (
-                    <span key={s.k} className="text-[11px] px-2 py-1 rounded-lg border border-slate-700 bg-slate-950">
-                      <span className="text-slate-500">{s.k}</span> <span className={s.c}>{s.v}</span>
+                    <span key={s.k} className="text-[11px] px-2 py-1 rounded-lg border" style={{ background: skin.bgInput, borderColor: skin.border }}>
+                      <span style={{ color: skin.textDim }}>{s.k}</span> <span className={s.c}>{s.v}</span>
                     </span>
                   ))}
                 </div>
 
                 {chartData.analysis.fuShen && (
-                  <div className="mt-2 text-[11px] text-slate-400 leading-relaxed">
+                  <div className="mt-2 text-[11px] leading-relaxed" style={{ color: skin.textMuted }}>
                     伏神：<span className="text-amber-300">{chartData.analysis.fuShen.liuqin}</span> 伏于第
                     {chartData.analysis.fuShen.position}爻 {chartData.analysis.fuShen.zhi}
-                    <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                    <span className="ml-1 px-1.5 py-0.5 rounded bg-slate-800" style={{ color: skin.textSecond }}>
                       {chartData.analysis.fuShen.state}
                     </span>
-                    <span className="text-slate-500 ml-1">{chartData.analysis.fuShen.reason}</span>
+                    <span className="ml-1" style={{ color: skin.textDim }}>{chartData.analysis.fuShen.reason}</span>
                   </div>
                 )}
 
                 {chartData.analysis.timings.length > 0 && (
                   <div className="mt-2">
-                    <div className="text-xs text-slate-500 mb-1">应期候选（只给地支条件，非公历日期）</div>
+                    <div className="text-xs mb-1" style={{ color: skin.textDim }}>应期候选（只给地支条件，非公历日期）</div>
                     <div className="flex flex-wrap gap-1.5">
                       {chartData.analysis.timings.map((t, i) => (
                         <span
                           key={i}
-                          className="text-[11px] px-2 py-1 rounded-lg border border-slate-700 bg-slate-950 text-slate-300"
+                          className="text-[11px] px-2 py-1 rounded-lg border" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textSecond }}
                         >
                           {t.meaning}
                           {t.triggerBranch && <span className="text-sky-300 ml-1">·{t.triggerBranch}</span>}
@@ -647,7 +657,7 @@ export default function LiuyaoPage() {
                 )}
 
                 {chartData.analysis.jianYao.length > 0 && (
-                  <div className="mt-2 text-[11px] text-slate-500">
+                  <div className="mt-2 text-[11px]" style={{ color: skin.textDim }}>
                     间爻（世应之间，主中间人/阻隔环节）：第 {chartData.analysis.jianYao.join("、")} 爻
                   </div>
                 )}
@@ -666,11 +676,10 @@ export default function LiuyaoPage() {
               type="button"
               onClick={handleInterpret}
               disabled={interpretLoading}
-              className={`mt-5 w-full py-3.5 rounded-xl font-bold text-base transition-all ${
-                interpretLoading
-                  ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20"
-              }`}
+              className="mt-5 w-full py-3.5 rounded-xl font-bold text-base transition-all"
+              style={interpretLoading
+                ? { background: skin.bgElevated, color: skin.textDim, cursor: "not-allowed" }
+                : { background: skin.gold, color: skin.textOnGold, boxShadow: "0 10px 15px -3px rgba(212,175,55,0.25)" }}
             >
               {interpretLoading ? "正在依卦解卦，请稍候…" : "第二步 · AI 依卦解卦"}
             </button>
@@ -679,18 +688,18 @@ export default function LiuyaoPage() {
 
         {/* 解卦结果 */}
         {answer && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+          <div className="border rounded-2xl p-6 shadow-2xl" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: skin.gold }}>
               <span>📖</span> 六爻鉴析
             </h2>
-            <div className="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">
+            <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: skin.textPrimary }}>
               {answer}
               {interpretLoading && <span className="inline-block w-2 h-4 ml-1 bg-amber-400 animate-pulse align-middle" />}
             </div>
           </div>
         )}
 
-        <p className="text-[11px] text-slate-600 text-center mt-8">
+        <p className="text-[11px] text-center mt-8" style={{ color: skin.textDim }}>
           卦象仅呈现特定时空的趋势信息，事在人为 · 仅供娱乐参考，不做医疗、投资等决策依据
         </p>
       </div>
