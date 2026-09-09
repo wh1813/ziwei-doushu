@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
+import { useTheme } from "@/components/ThemeProvider";
+import { getSkin } from "@/lib/ui/theme";
 
 const TIME_OPTIONS = [
   { value: 0, label: "早子时 00:00-01:00" },
@@ -75,6 +77,18 @@ const JI_XIONG_COLORS: Record<string, { bg: string; border: string; text: string
 };
 
 export default function XiaoliurenPage() {
+  const { theme } = useTheme();
+  const skin = getSkin(theme);
+
+  useLayoutEffect(() => {
+    document.documentElement.style.background = skin.bgBase;
+    document.body.style.background = skin.bgBase;
+    return () => {
+      document.documentElement.style.background = '';
+      document.body.style.background = '';
+    };
+  }, [skin.bgBase]);
+
   const [solarDate, setSolarDate] = useState("");
   const [timeIndex, setTimeIndex] = useState<number>(8);
   const [questionType, setQuestionType] = useState("求财");
@@ -176,12 +190,12 @@ export default function XiaoliurenPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4">
+    <div className="min-h-screen py-10 px-4" style={{ background: skin.bgBase, color: skin.textPrimary, transition: 'background 0.35s ease' }}>
       <div className="max-w-3xl mx-auto pt-14">
         <TopNav />
         {/* 页面标题 */}
-        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b border-slate-800">
-          <h1 className="text-xl font-bold tracking-wider text-cyan-400">小六壬 · 诸葛马前课</h1>
+        <div className="flex items-center justify-between mt-4 mb-6 pb-4 border-b" style={{ borderColor: skin.borderSubtle }}>
+          <h1 className="text-xl font-bold tracking-wider" style={{ color: skin.gold }}>小六壬 · 诸葛马前课</h1>
           <div className="w-12"></div>
         </div>
 
@@ -211,13 +225,13 @@ export default function XiaoliurenPage() {
             </svg>
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2 mb-1.5">
-                <span className="text-base font-bold text-cyan-300">诸葛马前 · 掐指一算</span>
+                <span className="text-base font-bold" style={{ color: skin.goldLight }}>诸葛马前 · 掐指一算</span>
                 <span className="text-[10px] text-amber-300/80 font-mono tracking-widest">XIǍO LIÙ RÉN</span>
               </div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs leading-relaxed" style={{ color: skin.textSecond }}>
                 诸葛亮行军途中创制，<span className="text-amber-300 font-semibold">只需月日时三步</span>：
                 大安起月、月上起日、日上起时——
-                <span className="text-cyan-300 font-semibold">大安 / 速喜 / 小吉</span>
+                <span className="font-semibold" style={{ color: skin.goldLight }}>大安 / 速喜 / 小吉</span>
                 为吉，<span className="text-rose-300 font-semibold">留连 / 赤口 / 空亡</span>
                 为凶。轻巧迅捷，<span className="font-semibold">掐指即得</span>。本局程序严判掌诀六神与吉凶等级。
               </p>
@@ -226,34 +240,34 @@ export default function XiaoliurenPage() {
         </div>
 
         {/* 输入表单 */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8 space-y-5">
-          <p className="text-xs text-slate-500 leading-relaxed">
-            本功能由程序先用 <span className="text-cyan-400">确定性掌诀法严格起课</span>
+        <div className="border rounded-2xl p-6 shadow-xl mb-8 space-y-5" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
+          <p className="text-xs leading-relaxed" style={{ color: skin.textDim }}>
+            本功能由程序先用 <span style={{ color: skin.gold }}>确定性掌诀法严格起课</span>
             （大安→月宫→日宫→时宫，三步顺数结果为程序严格计算，非 AI 猜测），
-            起课确认后再交由 AI 依课解断 —— <span className="text-cyan-400">先起课，再解课</span>。
+            起课确认后再交由 AI 依课解断 —— <span style={{ color: skin.gold }}>先起课，再解课</span>。
           </p>
 
           {/* 起课日期 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">📅 起课日期（阳历，必填）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>📅 起课日期（阳历，必填）</label>
             <input
               type="date"
               value={solarDate}
               onChange={(e) => setSolarDate(e.target.value)}
               min="1900-01-01"
               max="2049-12-31"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+              className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             />
-            <p className="text-xs text-slate-500 mt-1">按北京时间起课；问事一般以当下时间起课</p>
+            <p className="text-xs mt-1" style={{ color: skin.textDim }}>按北京时间起课；问事一般以当下时间起课</p>
           </div>
 
           {/* 时辰 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">⏰ 起课时辰（必选）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>⏰ 起课时辰（必选）</label>
             <select
               value={timeIndex}
               onChange={(e) => setTimeIndex(Number(e.target.value))}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+              className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-slate-500" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             >
               {TIME_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -263,18 +277,17 @@ export default function XiaoliurenPage() {
 
           {/* 性别 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">👤 性别（影响婚恋用神）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>👤 性别（影响婚恋用神）</label>
             <div className="flex flex-wrap gap-2">
               {GENDERS.map((g) => (
                 <button
                   key={g.value}
                   type="button"
                   onClick={() => setGender(g.value as "男" | "女" | "不指定")}
-                  className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${
-                    gender === g.value
-                      ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 font-bold"
-                      : "border-slate-700 hover:bg-slate-800 text-slate-400"
-                  }`}
+                  className="px-3.5 py-1.5 text-sm rounded-lg border transition-all"
+                  style={gender === g.value
+                    ? { background: "rgba(212,175,55,0.12)", borderColor: skin.gold, color: skin.goldLight, fontWeight: 700 }
+                    : { borderColor: skin.border, color: skin.textMuted }}
                 >
                   {g.label}
                 </button>
@@ -284,18 +297,17 @@ export default function XiaoliurenPage() {
 
           {/* 所问事项类型 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">🗂️ 所问事项类型</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>🗂️ 所问事项类型</label>
             <div className="flex flex-wrap gap-2">
               {QUESTION_TYPES.map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setQuestionType(t)}
-                  className={`px-3.5 py-1.5 text-sm rounded-lg border transition-all ${
-                    questionType === t
-                      ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 font-bold"
-                      : "border-slate-700 hover:bg-slate-800 text-slate-400"
-                  }`}
+                  className="px-3.5 py-1.5 text-sm rounded-lg border transition-all"
+                  style={questionType === t
+                    ? { background: "rgba(212,175,55,0.12)", borderColor: skin.gold, color: skin.goldLight, fontWeight: 700 }
+                    : { borderColor: skin.border, color: skin.textMuted }}
                 >
                   {t}
                 </button>
@@ -305,14 +317,14 @@ export default function XiaoliurenPage() {
 
           {/* 具体问题 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">💬 具体想问的事（可选）</label>
+            <label className="block text-sm font-medium mb-2" style={{ color: skin.textSecond }}>💬 具体想问的事（可选）</label>
             <textarea
               value={questionGoal}
               onChange={(e) => setQuestionGoal(e.target.value)}
               placeholder="例如：今天面试能否通过？这笔钱能不能借？"
               rows={3}
               maxLength={500}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 resize-none"
+              className="w-full border rounded-lg p-3 text-sm placeholder-slate-500 focus:outline-none focus:border-slate-500 resize-none" style={{ background: skin.bgInput, borderColor: skin.border, color: skin.textPrimary }}
             />
           </div>
 
@@ -326,11 +338,10 @@ export default function XiaoliurenPage() {
             type="button"
             onClick={handleCastChart}
             disabled={loadingChart || !solarDate}
-            className={`w-full py-3.5 rounded-xl font-bold text-base transition-all ${
-              loadingChart || !solarDate
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                : "bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20"
-            }`}
+            className="w-full py-3.5 rounded-xl font-bold text-base transition-all"
+            style={loadingChart || !solarDate
+              ? { background: skin.bgElevated, color: skin.textDim, cursor: "not-allowed" }
+              : { background: skin.gold, color: skin.textOnGold, boxShadow: "0 10px 15px -3px rgba(212,175,55,0.25)" }}
           >
             {loadingChart ? "正在掐指起课…" : "第一步 · 掐指起课"}
           </button>
@@ -338,38 +349,38 @@ export default function XiaoliurenPage() {
 
         {/* 起课结果 */}
         {chartData && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl mb-8">
+          <div className="border rounded-2xl p-6 shadow-xl mb-8" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
             {/* 起课信息 */}
             <div className="space-y-1.5 mb-5">
-              <div className="text-xs text-slate-400">
+              <div className="text-xs" style={{ color: skin.textMuted }}>
                 公历 {chartData.input.solarDate} · 农历 {chartData.lunar.yearGanZhi}年 {chartData.lunar.monthGanZhi}月 {chartData.lunar.dayGanZhi}日 {chartData.lunar.timeGanZhi}时
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs" style={{ color: skin.textMuted }}>
                 生肖 {chartData.lunar.yearZodiac} · 农历 {chartData.lunar.month}月{chartData.lunar.day}日 · 时辰序号 {chartData.timeOrdinal}
               </div>
             </div>
 
             {/* 三步掌诀 */}
             <div className="mb-5">
-              <div className="text-xs text-slate-500 mb-2">掌诀三步（从大安起）</div>
+              <div className="text-xs mb-2" style={{ color: skin.textDim }}>掌诀三步（从大安起）</div>
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-slate-950 border border-slate-800">
-                  <span className="w-14 text-slate-500 text-xs">① 月宫</span>
-                  <span className="text-slate-400 text-xs">大安起 {chartData.lunar.month} 月</span>
-                  <span className="text-slate-500 text-xs">→</span>
-                  <span className="text-base font-bold text-cyan-300">{chartData.steps.monthGong}</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border" style={{ background: skin.bgInput, borderColor: skin.borderSubtle }}>
+                  <span className="w-14 text-xs" style={{ color: skin.textDim }}>① 月宫</span>
+                  <span className="text-xs" style={{ color: skin.textMuted }}>大安起 {chartData.lunar.month} 月</span>
+                  <span className="text-xs" style={{ color: skin.textDim }}>→</span>
+                  <span className="text-base font-bold" style={{ color: skin.goldLight }}>{chartData.steps.monthGong}</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-slate-950 border border-slate-800">
-                  <span className="w-14 text-slate-500 text-xs">② 日宫</span>
-                  <span className="text-slate-400 text-xs">{chartData.steps.monthGong}起 {chartData.lunar.day} 日</span>
-                  <span className="text-slate-500 text-xs">→</span>
-                  <span className="text-base font-bold text-cyan-300">{chartData.steps.dayGong}</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border" style={{ background: skin.bgInput, borderColor: skin.borderSubtle }}>
+                  <span className="w-14 text-xs" style={{ color: skin.textDim }}>② 日宫</span>
+                  <span className="text-xs" style={{ color: skin.textMuted }}>{chartData.steps.monthGong}起 {chartData.lunar.day} 日</span>
+                  <span className="text-xs" style={{ color: skin.textDim }}>→</span>
+                  <span className="text-base font-bold" style={{ color: skin.goldLight }}>{chartData.steps.dayGong}</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-slate-950 border border-slate-800">
-                  <span className="w-14 text-slate-500 text-xs">③ 时宫</span>
-                  <span className="text-slate-400 text-xs">{chartData.steps.dayGong}起 {chartData.timeOrdinal} 时辰</span>
-                  <span className="text-slate-500 text-xs">→</span>
-                  <span className="text-base font-bold text-cyan-300">{chartData.steps.timeGong}</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border" style={{ background: skin.bgInput, borderColor: skin.borderSubtle }}>
+                  <span className="w-14 text-xs" style={{ color: skin.textDim }}>③ 时宫</span>
+                  <span className="text-xs" style={{ color: skin.textMuted }}>{chartData.steps.dayGong}起 {chartData.timeOrdinal} 时辰</span>
+                  <span className="text-xs" style={{ color: skin.textDim }}>→</span>
+                  <span className="text-base font-bold" style={{ color: skin.goldLight }}>{chartData.steps.timeGong}</span>
                 </div>
               </div>
             </div>
@@ -383,18 +394,18 @@ export default function XiaoliurenPage() {
                     <span className={`text-3xl font-bold ${colors.text}`}>{chartData.result.liuShen}</span>
                     <span className={`text-sm font-bold ${colors.text}`}>{chartData.result.jiXiong}</span>
                   </div>
-                  <div className="text-xs text-slate-400 leading-relaxed">
+                  <div className="text-xs leading-relaxed" style={{ color: skin.textMuted }}>
                     五行 <span className={colors.text}>{chartData.result.wuxing}</span>
-                    <span className="text-slate-600"> · </span>
+                    <span style={{ color: skin.textDim }}> · </span>
                     方位 <span className={colors.text}>{chartData.result.fangwei}</span>
-                    <span className="text-slate-600"> · </span>
+                    <span style={{ color: skin.textDim }}> · </span>
                     体象 <span className={colors.text}>{chartData.result.tiXiang}</span>
-                    <span className="text-slate-600"> · </span>
+                    <span style={{ color: skin.textDim }}> · </span>
                     主数 <span className={colors.text}>{chartData.result.shu}</span>
-                    <span className="text-slate-600"> · </span>
+                    <span style={{ color: skin.textDim }}> · </span>
                     季 <span className={colors.text}>{chartData.result.season}</span>
                   </div>
-                  <div className="mt-2 text-sm text-slate-200 leading-relaxed">
+                  <div className="mt-2 text-sm leading-relaxed" style={{ color: skin.textPrimary }}>
                     {chartData.result.brief}
                   </div>
                 </div>
@@ -413,11 +424,10 @@ export default function XiaoliurenPage() {
               type="button"
               onClick={handleInterpret}
               disabled={interpretLoading}
-              className={`mt-5 w-full py-3.5 rounded-xl font-bold text-base transition-all ${
-                interpretLoading
-                  ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                  : "bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20"
-              }`}
+              className="mt-5 w-full py-3.5 rounded-xl font-bold text-base transition-all"
+              style={interpretLoading
+                ? { background: skin.bgElevated, color: skin.textDim, cursor: "not-allowed" }
+                : { background: skin.gold, color: skin.textOnGold, boxShadow: "0 10px 15px -3px rgba(212,175,55,0.25)" }}
             >
               {interpretLoading ? "正在依课解断，请稍候…" : "第二步 · AI 依课解断"}
             </button>
@@ -426,18 +436,18 @@ export default function XiaoliurenPage() {
 
         {/* 解课结果 */}
         {answer && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-cyan-400 mb-4 flex items-center gap-2">
+          <div className="border rounded-2xl p-6 shadow-2xl" style={{ background: skin.bgSurface, borderColor: skin.borderSubtle }}>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: skin.gold }}>
               <span>📖</span> 小六壬鉴断
             </h2>
-            <div className="whitespace-pre-wrap text-sm text-slate-200 leading-relaxed">
+            <div className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: skin.textPrimary }}>
               {answer}
-              {interpretLoading && <span className="inline-block w-2 h-4 ml-1 bg-cyan-400 animate-pulse align-middle" />}
+              {interpretLoading && <span className="inline-block w-2 h-4 ml-1 animate-pulse align-middle" style={{ background: skin.gold }} />}
             </div>
           </div>
         )}
 
-        <p className="text-[11px] text-slate-600 text-center mt-8">
+        <p className="text-[11px] text-center mt-8" style={{ color: skin.textDim }}>
           掌诀仅呈现特定时空的趋势信息，事在人为 · 仅供娱乐参考，不做医疗、投资等决策依据
         </p>
       </div>
