@@ -32,6 +32,10 @@ jobs:
       - name: Build with OpenNext
         run: npx @opennextjs/cloudflare build
 
+      - name: Apply D1 migrations (idempotent)
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: npx wrangler d1 migrations apply ziwei-doushu-logs --remote
+
       - name: Deploy to Cloudflare Workers
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         run: npx @opennextjs/cloudflare deploy
